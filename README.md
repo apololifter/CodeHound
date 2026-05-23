@@ -1,0 +1,282 @@
+<div align="center">
+
+![CodeHound Banner](https://raw.githubusercontent.com/apololifter/CodeHound/main/docs/banner.png)
+
+# CodeHound 🐾
+
+**Hybrid static & dynamic code analysis tool with AI-powered explanations and interactive call graphs.**
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+
+</div>
+
+---
+
+## ¿Qué es CodeHound?
+
+CodeHound es una herramienta de análisis de código que combina análisis estático, dinámico e inteligencia artificial para ayudarte a entender, auditar y encontrar vulnerabilidades en proyectos **Python**, **JavaScript** y **PHP**.
+
+Apunta a un directorio, escanea el proyecto y obtienes:
+
+- Un **grafo interactivo** de archivos, funciones y dependencias
+- **Flujo de datos** línea a línea dentro de cada función
+- **Simulación de taint** para rastrear datos no confiables hasta sus sinks
+- **Ejecución dinámica en sandbox** con fuzzing automático (Python)
+- **Explicaciones en lenguaje natural** de cualquier función via IA
+
+---
+
+## Características
+
+### 🔍 Análisis estático
+Escanea el árbol de archivos y construye un grafo de nodos (archivos, funciones, clases) y aristas (llamadas, importaciones, dependencias) usando **tree-sitter** como parser. Soporta Python, JavaScript y PHP de forma nativa.
+
+### 🌊 Análisis de flujo de datos
+Clasifica cada instrucción dentro de una función en:
+
+| Tipo | Descripción |
+|------|-------------|
+| `CAPTURE` | El dato externo entra al scope |
+| `TRANSFORM` | El dato es procesado o modificado |
+| `SANITIZE` | El dato es validado o limpiado |
+| `SINK` | El dato llega a una operación sensible |
+| `CALL` | Llamada a función externa |
+| `RETURN` | El dato sale de la función |
+
+### ☣️ Taint Engine
+Simula la propagación de un payload desde una fuente de entrada hasta los sinks del proyecto. Traza el camino interprocedural completo: de función en función, de archivo en archivo.
+
+### 🧪 Sandbox & Fuzzer
+Ejecuta dinámicamente funciones Python en un entorno controlado para verificar el comportamiento real frente a inputs maliciosos. El fuzzer genera automáticamente casos de prueba (SQLi, XSS, path traversal, etc.) y reporta cuáles producen comportamientos anómalos.
+
+### 🤖 Explicaciones con IA
+Selecciona cualquier función del grafo y obtén una explicación en lenguaje natural generada por IA (OpenAI, Gemini o Groq), con el contexto línea a línea del código.
+
+### 🗺️ Grafo interactivo
+Visualización construida con **React Flow (XYFlow)** + **dagre** para layout automático. Navega el proyecto completo como un grafo, filtra por archivo, haz zoom en funciones específicas y explora las conexiones entre módulos.
+
+---
+
+## Stack tecnológico
+
+**Backend**
+- [FastAPI](https://fastapi.tiangolo.com/) — API REST
+- [tree-sitter](https://tree-sitter.github.io/tree-sitter/) — parsing de código fuente
+- [Uvicorn](https://www.uvicorn.org/) — servidor ASGI
+- OpenAI / Google Gemini / Groq — explicaciones con IA
+
+**Frontend**
+- [React 19](https://react.dev/) + [Vite 8](https://vite.dev/)
+- [@xyflow/react](https://reactflow.dev/) — grafo interactivo
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) — visor de código
+- [Mermaid](https://mermaid.js.org/) — diagramas de flujo
+- [dagre](https://github.com/dagrejs/dagre) — layout de grafos
+
+---
+
+## Requisitos previos
+
+| Herramienta | Versión mínima |
+|-------------|---------------|
+| Python | 3.10+ |
+| Node.js | 18+ |
+| pnpm | cualquier versión reciente |
+
+---
+
+## Instalación
+
+### Opción A — Setup automático (recomendado)
+
+Descarga [`setup.py`](setup.py), colócalo en la raíz del proyecto y ejecútalo:
+
+```bash
+# Windows (como Administrador)
+python setup.py
+
+# Linux / macOS
+sudo python3 setup.py
+```
+
+El script detecta tu sistema operativo, instala todas las dependencias y deja el proyecto listo para correr.
+
+### Opción B — Manual
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/apololifter/CodeHound.git
+cd CodeHound
+
+# 2. Crear entorno virtual Python
+python -m venv venv
+
+# Windows
+.\venv\Scripts\activate
+
+# Linux / macOS
+source venv/bin/activate
+
+# 3. Instalar dependencias Python
+pip install fastapi "uvicorn[standard]" pydantic \
+    tree-sitter tree-sitter-python tree-sitter-javascript tree-sitter-php \
+    openai google-generativeai groq python-dotenv
+
+# 4. Instalar dependencias del frontend
+cd frontend
+pnpm install
+```
+
+---
+
+## Configuración
+
+Crea un archivo `.env` en la raíz del proyecto con las claves de IA que vayas a usar:
+
+```env
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...
+GROQ_API_KEY=gsk_...
+```
+
+> [!NOTE]
+> No es obligatorio tener las tres. Con una sola clave es suficiente para usar las explicaciones con IA.
+
+> [!WARNING]
+> Nunca subas el archivo `.env` a GitHub. Ya está incluido en `.gitignore`.
+
+---
+
+## Uso
+
+### Iniciar la herramienta
+
+```bash
+cd frontend
+pnpm run dev
+```
+
+Esto levanta el backend y el frontend en paralelo:
+
+| Servicio | URL |
+|----------|-----|
+| Frontend | http://localhost:5173 |
+| Backend API | http://127.0.0.1:8000 |
+| Docs interactivos | http://127.0.0.1:8000/docs |
+
+### Escanear un proyecto
+
+1. Abre http://localhost:5173 en el navegador
+2. Ingresa la ruta absoluta del directorio a analizar
+3. Haz clic en **Escanear proyecto**
+4. Explora el grafo generado: nodos de archivo (🗂️) y funciones (⚙️)
+
+### Analizar una función
+
+1. Haz clic sobre cualquier nodo de función en el grafo
+2. En el panel derecho aparece el código fuente con Monaco Editor
+3. Usa los botones del panel para:
+   - **Flujo de datos** — ver el análisis línea a línea
+   - **Simular taint** — rastrear un payload desde esa función
+   - **Sandbox** — ejecutar dinámicamente con un input específico
+   - **Explicar con IA** — obtener una descripción en lenguaje natural
+
+---
+
+## API REST
+
+Todos los endpoints aceptan y devuelven JSON.
+
+```
+POST /api/scan                  Escanear un directorio
+POST /api/read_file             Leer el contenido de un archivo
+POST /api/save_file             Guardar cambios en un archivo
+POST /api/analyze/dataflow      Flujo de datos de una función
+POST /api/simulate/taint        Simular propagación de taint
+POST /api/simulate/sandbox      Ejecución dinámica con payload
+POST /api/simulate/fuzzing      Fuzzing automático de una función
+POST /api/ai/explain            Explicación con IA de una función
+```
+
+Ejemplo:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/scan \
+  -H "Content-Type: application/json" \
+  -d '{"directory": "/ruta/al/proyecto"}'
+```
+
+---
+
+## Estructura del proyecto
+
+```
+CodeHound/
+├── main.py                  # Servidor FastAPI
+├── setup.py                 # Setup universal (Windows + Linux)
+├── .env                     # Claves de API (no commitear)
+├── analyzer/
+│   ├── scanner.py           # Descubrimiento de archivos
+│   ├── parser.py            # Parsing con tree-sitter
+│   ├── hybrid_detector.py   # Selección de estrategia por lenguaje
+│   ├── dataflow_analyzer.py # Análisis de flujo de datos
+│   ├── taint_engine.py      # Motor de propagación de taint
+│   ├── ai_agent.py          # Integración con LLMs
+│   └── sandbox_runner.py    # Ejecución dinámica y fuzzer
+├── frontend/
+│   ├── src/                 # Código React
+│   ├── package.json
+│   └── vite.config.js
+└── test_project/            # Proyecto de ejemplo para probar
+```
+
+---
+
+## Lenguajes soportados
+
+| Lenguaje | Escaneo | Grafo | Dataflow | Taint | Sandbox |
+|----------|:-------:|:-----:|:--------:|:-----:|:-------:|
+| Python | ✅ | ✅ | ✅ | ✅ | ✅ |
+| JavaScript | ✅ | ✅ | ✅ | ✅ | ❌ |
+| PHP | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+---
+
+## Seguridad
+
+CodeHound tiene protecciones para evitar que sea usado de forma maliciosa:
+
+- **Directorios del sistema bloqueados** — no se puede escanear `C:\Windows`, `/etc`, `/bin`, `/usr`, etc.
+- **Sandbox aislado** — la ejecución dinámica ocurre en un subproceso controlado
+- **Sin ejecución remota** — el backend solo acepta conexiones locales (`127.0.0.1`)
+
+> [!CAUTION]
+> Esta herramienta está diseñada para analizar código propio o de terceros con autorización explícita. No la uses para auditar sistemas sin permiso.
+
+---
+
+## Contribuir
+
+Las contribuciones son bienvenidas. Por favor:
+
+1. Haz un fork del repositorio
+2. Crea una rama para tu feature: `git checkout -b feature/nueva-funcionalidad`
+3. Haz commit de tus cambios: `git commit -m 'feat: agregar soporte para Ruby'`
+4. Abre un Pull Request
+
+---
+
+## Licencia
+
+Distribuido bajo la licencia MIT. Ver [`LICENSE`](LICENSE) para más detalles.
+
+---
+
+<div align="center">
+
+Hecho con 🐾 por [apololifter](https://github.com/apololifter)
+
+</div>
