@@ -341,5 +341,27 @@ def simulate_endpoint(req: SimulateRequest):
     return result
 
 
+@app.get("/api/browse")
+def browse_endpoint():
+    import sys
+    import subprocess
+    try:
+        # Spawning tkinter file dialog in a separate python process is 100% thread-safe
+        cmd = [
+            sys.executable,
+            "-c",
+            "import tkinter as tk; from tkinter import filedialog; root=tk.Tk(); root.withdraw(); root.attributes('-topmost', True); d=filedialog.askdirectory(title='Seleccionar Carpeta de Proyecto'); print(d)"
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        selected_dir = result.stdout.strip()
+        if selected_dir:
+            selected_dir = os.path.normpath(selected_dir).replace("\\", "/")
+            return {"directory": selected_dir}
+        return {"directory": ""}
+    except Exception as e:
+        logger.exception("Error in browse subprocess")
+        raise HTTPException(status_code=500, detail=f"Error al abrir el explorador de archivos: {str(e)}")
+
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

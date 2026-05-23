@@ -62,11 +62,31 @@ function getLayoutedElements(nodes, edges, mode) {
     return { nodes: [...parents, ...funcs], edges };
 
   } else if (mode === 'attack_path') {
-    const g = new dagre.graphlib.Graph();
+    const g = new dagre.graphlib.Graph({ compound: true });
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120, marginx: 40, marginy: 40 });
 
-    nodes.forEach(n => g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
+    nodes.forEach(n => {
+      if (n.data?.type === 'file') {
+        const hasVisibleChildren = nodes.some(c => c.data?.parent === n.id && c.id !== n.id);
+        if (hasVisibleChildren) {
+          g.setNode(n.id, { minWidth: 240, minHeight: 140, paddingTop: 60, paddingBottom: 20, paddingLeft: 20, paddingRight: 20 });
+        } else {
+          g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+        }
+      } else {
+        g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+      }
+    });
+
+    nodes.forEach(n => {
+      if (n.data?.type === 'function' && n.data?.parent) {
+        if (nodes.some(p => p.id === n.data.parent)) {
+          g.setParent(n.id, n.data.parent);
+        }
+      }
+    });
+
     edges.forEach(e => {
       if (g.hasNode(e.source) && g.hasNode(e.target)) {
         g.setEdge(e.source, e.target);
@@ -75,21 +95,49 @@ function getLayoutedElements(nodes, edges, mode) {
 
     dagre.layout(g);
 
-    return {
-      nodes: nodes.map(n => {
-        const nodeWithPosition = g.node(n.id);
+    const layoutedNodes = nodes.map(n => {
+      const pos = g.node(n.id);
+      if (!pos) return n;
+
+      const hasParent = n.data?.type === 'function' && n.data?.parent && nodes.some(p => p.id === n.data.parent);
+      if (hasParent) {
+        const parentPos = g.node(n.data.parent);
+        const parentLeft = parentPos.x - parentPos.width / 2;
+        const parentTop = parentPos.y - parentPos.height / 2;
+        const childLeft = pos.x - pos.width / 2;
+        const childTop = pos.y - pos.height / 2;
         return {
           ...n,
+          parentId: n.data.parent,
+          extent: 'parent',
           targetPosition: 'left',
           sourcePosition: 'right',
           position: {
-            x: nodeWithPosition.x - NODE_WIDTH / 2,
-            y: nodeWithPosition.y - NODE_HEIGHT / 2
+            x: childLeft - parentLeft,
+            y: childTop - parentTop
           }
         };
-      }),
-      edges
-    };
+      } else {
+        return {
+          ...n,
+          parentId: undefined,
+          extent: undefined,
+          targetPosition: 'left',
+          sourcePosition: 'right',
+          position: {
+            x: pos.x - pos.width / 2,
+            y: pos.y - pos.height / 2
+          },
+          style: {
+            ...n.style,
+            width: pos.width,
+            height: pos.height
+          }
+        };
+      }
+    });
+
+    return { nodes: layoutedNodes, edges };
   } else if (mode === 'force') {
     const simulationNodes = nodes.map(n => ({ ...n, x: Math.random() * 800, y: Math.random() * 800 }));
     const simulationEdges = edges.map(e => ({ ...e, source: e.source, target: e.target }));
@@ -118,11 +166,31 @@ function getLayoutedElements(nodes, edges, mode) {
   }
 
   // Default Hierarchical (dagre)
-  const g = new dagre.graphlib.Graph();
+  const g = new dagre.graphlib.Graph({ compound: true });
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 });
 
-  nodes.forEach(n => g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
+  nodes.forEach(n => {
+    if (n.data?.type === 'file') {
+      const hasVisibleChildren = nodes.some(c => c.data?.parent === n.id && c.id !== n.id);
+      if (hasVisibleChildren) {
+        g.setNode(n.id, { minWidth: 240, minHeight: 140, paddingTop: 60, paddingBottom: 20, paddingLeft: 20, paddingRight: 20 });
+      } else {
+        g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+      }
+    } else {
+      g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    }
+  });
+
+  nodes.forEach(n => {
+    if (n.data?.type === 'function' && n.data?.parent) {
+      if (nodes.some(p => p.id === n.data.parent)) {
+        g.setParent(n.id, n.data.parent);
+      }
+    }
+  });
+
   edges.forEach(e => {
     if (g.hasNode(e.source) && g.hasNode(e.target)) {
       g.setEdge(e.source, e.target);
@@ -133,15 +201,44 @@ function getLayoutedElements(nodes, edges, mode) {
 
   const layoutedNodes = nodes.map(n => {
     const pos = g.node(n.id);
-    return {
-      ...n,
-      targetPosition: 'top',
-      sourcePosition: 'bottom',
-      position: {
-        x: pos ? pos.x - NODE_WIDTH / 2 : 0,
-        y: pos ? pos.y - NODE_HEIGHT / 2 : 0,
-      },
-    };
+    if (!pos) return n;
+
+    const hasParent = n.data?.type === 'function' && n.data?.parent && nodes.some(p => p.id === n.data.parent);
+    if (hasParent) {
+      const parentPos = g.node(n.data.parent);
+      const parentLeft = parentPos.x - parentPos.width / 2;
+      const parentTop = parentPos.y - parentPos.height / 2;
+      const childLeft = pos.x - pos.width / 2;
+      const childTop = pos.y - pos.height / 2;
+      return {
+        ...n,
+        parentId: n.data.parent,
+        extent: 'parent',
+        targetPosition: 'top',
+        sourcePosition: 'bottom',
+        position: {
+          x: childLeft - parentLeft,
+          y: childTop - parentTop
+        }
+      };
+    } else {
+      return {
+        ...n,
+        parentId: undefined,
+        extent: undefined,
+        targetPosition: 'top',
+        sourcePosition: 'bottom',
+        position: {
+          x: pos.x - pos.width / 2,
+          y: pos.y - pos.height / 2
+        },
+        style: {
+          ...n.style,
+          width: pos.width,
+          height: pos.height
+        }
+      };
+    }
   });
 
   return { nodes: layoutedNodes, edges };

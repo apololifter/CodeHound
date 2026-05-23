@@ -8,7 +8,6 @@ import { DataFlowInspector } from './components/DataFlowInspector';
 import { SequenceDiagram } from './components/SequenceDiagram';
 import { SandboxModal } from './components/SandboxModal';
 import { SkipBack, SkipForward } from 'lucide-react';
-import { Group, Panel, Separator } from 'react-resizable-panels';
 import { Rnd } from 'react-rnd';
 
 function formatAiExplanation(text, onSelectLine) {
@@ -331,6 +330,84 @@ function App() {
   const [simulatedDataFlow, setSimulatedDataFlow] = useState(null);
   const [useGlobalFlow, setUseGlobalFlow] = useState(true);
 
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [rightPanelWidth, setRightPanelWidth] = useState(450);
+  const [topHeightPercent, setTopHeightPercent] = useState(55);
+
+  const isResizingSidebar = useRef(false);
+  const isResizingRight = useRef(false);
+  const isResizingVertical = useRef(false);
+
+  const resizeSidebar = useCallback((e) => {
+    if (!isResizingSidebar.current) return;
+    const newWidth = Math.max(200, Math.min(500, e.clientX));
+    setSidebarWidth(newWidth);
+  }, []);
+
+  const stopResizeSidebar = useCallback(() => {
+    isResizingSidebar.current = false;
+    document.removeEventListener('mousemove', resizeSidebar);
+    document.removeEventListener('mouseup', stopResizeSidebar);
+    document.body.style.cursor = 'default';
+    document.body.style.userSelect = 'auto';
+  }, [resizeSidebar]);
+
+  const startResizeSidebar = useCallback(() => {
+    isResizingSidebar.current = true;
+    document.addEventListener('mousemove', resizeSidebar);
+    document.addEventListener('mouseup', stopResizeSidebar);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [resizeSidebar, stopResizeSidebar]);
+
+  const resizeRight = useCallback((e) => {
+    if (!isResizingRight.current) return;
+    const newWidth = Math.max(280, Math.min(800, window.innerWidth - e.clientX));
+    setRightPanelWidth(newWidth);
+  }, []);
+
+  const stopResizeRight = useCallback(() => {
+    isResizingRight.current = false;
+    document.removeEventListener('mousemove', resizeRight);
+    document.removeEventListener('mouseup', stopResizeRight);
+    document.body.style.cursor = 'default';
+    document.body.style.userSelect = 'auto';
+  }, [resizeRight]);
+
+  const startResizeRight = useCallback(() => {
+    isResizingRight.current = true;
+    document.addEventListener('mousemove', resizeRight);
+    document.addEventListener('mouseup', stopResizeRight);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [resizeRight, stopResizeRight]);
+
+  const resizeVertical = useCallback((e) => {
+    if (!isResizingVertical.current) return;
+    const rightPanelEl = document.getElementById('right-panel-container');
+    if (!rightPanelEl) return;
+    const rect = rightPanelEl.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    const newPercent = Math.max(20, Math.min(80, (relativeY / rect.height) * 100));
+    setTopHeightPercent(newPercent);
+  }, []);
+
+  const stopResizeVertical = useCallback(() => {
+    isResizingVertical.current = false;
+    document.removeEventListener('mousemove', resizeVertical);
+    document.removeEventListener('mouseup', stopResizeVertical);
+    document.body.style.cursor = 'default';
+    document.body.style.userSelect = 'auto';
+  }, [resizeVertical]);
+
+  const startResizeVertical = useCallback(() => {
+    isResizingVertical.current = true;
+    document.addEventListener('mousemove', resizeVertical);
+    document.addEventListener('mouseup', stopResizeVertical);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [resizeVertical, stopResizeVertical]);
+
   const handleScanComplete = (data, dir) => {
     setGlobalData(data);
     setDirectory(dir);
@@ -617,9 +694,20 @@ function App() {
 
       <div className="main-content">
         {!hasScanned ? (
-          <Group direction="horizontal" key="welcome-layout">
-            {/* Panel 1: Sidebar */}
-            <Panel defaultSize={20} minSize={15} maxSize={30} id="sidebar-panel">
+          <>
+            {/* Sidebar container */}
+            <div 
+              id="sidebar-container"
+              style={{ 
+                width: `${sidebarWidth}px`, 
+                flexShrink: 0, 
+                minWidth: '200px', 
+                maxWidth: '500px',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
               <Sidebar
                 onScanTrigger={handleScan}
                 loading={isScanLoading}
@@ -634,291 +722,417 @@ function App() {
                 onSimulate={handleSimulate}
                 sandboxData={sandboxData}
               />
-            </Panel>
+            </div>
 
-            <Separator className="resize-handle-horizontal" />
+            {/* Separator */}
+            <div 
+              className="resize-handle-horizontal" 
+              onMouseDown={startResizeSidebar}
+            />
 
-            {/* Panel 2: Center Panel (Welcome Screen / Loader) */}
-            <Panel defaultSize={80} id="center-panel">
-              <div className="center-panel" style={{ height: '100%' }}>
-                <div className="graph-container" style={{ position: 'relative', height: '100%' }}>
-                  {isScanLoading ? (
+            {/* Center panel (Welcome Screen / Loader) */}
+            <div className="center-panel" style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div className="graph-container" style={{ position: 'relative', height: '100%' }}>
+                {isScanLoading ? (
+                  <div style={{
+                    flex: 1, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    background: '#0f111a', color: '#f3f4f6', gap: '20px', height: '100%',
+                    position: 'relative', zIndex: 10
+                  }}>
                     <div style={{
-                      flex: 1, display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      background: '#0f111a', color: '#f3f4f6', gap: '20px', height: '100%',
-                      position: 'relative', zIndex: 10
-                    }}>
-                      <div style={{
-                        width: '48px', height: '48px',
-                        border: '4px solid rgba(99, 102, 241, 0.1)',
-                        borderTop: '4px solid #6366f1',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                        boxShadow: '0 0 15px rgba(99, 102, 241, 0.2)'
-                      }} />
-                      <style dangerouslySetInnerHTML={{__html: `
-                        @keyframes spin {
-                          0% { transform: rotate(0deg); }
-                          100% { transform: rotate(360deg); }
-                        }
-                      `}} />
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', letterSpacing: '0.5px' }}>
-                          Escaneando Proyecto
-                        </span>
-                        <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
-                          {directory}
-                        </span>
-                      </div>
+                      width: '48px', height: '48px',
+                      border: '4px solid rgba(99, 102, 241, 0.1)',
+                      borderTop: '4px solid #6366f1',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                      boxShadow: '0 0 15px rgba(99, 102, 241, 0.2)'
+                    }} />
+                    <style dangerouslySetInnerHTML={{__html: `
+                      @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                    `}} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', letterSpacing: '0.5px' }}>
+                        Escaneando Proyecto
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
+                        {directory}
+                      </span>
                     </div>
+                  </div>
+                ) : (
+                  <WelcomeScreen />
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Sidebar container */}
+            <div 
+              id="sidebar-container"
+              style={{ 
+                width: `${sidebarWidth}px`, 
+                flexShrink: 0, 
+                minWidth: '200px', 
+                maxWidth: '500px',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <Sidebar
+                onScanTrigger={handleScan}
+                loading={isScanLoading}
+                error={scanError}
+                scanResult={scanResult}
+                directory={directory}
+                setDirectory={setDirectory}
+                globalNodes={globalData.nodes}
+                discoveredSources={globalData.discovered_sources}
+                focusedNodeId={focusedNodeId}
+                setFocusedNodeId={(id) => { setFocusedNodeId(id); if (id) setExpandedNodes(p => new Set(p).add(id)); }}
+                onSimulate={handleSimulate}
+                sandboxData={sandboxData}
+              />
+            </div>
+
+            {/* Separator */}
+            <div 
+              className="resize-handle-horizontal" 
+              onMouseDown={startResizeSidebar}
+            />
+
+            {/* Center panel (Graph Canvas & Time-Travel) */}
+            <div className="center-panel" style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* Vuln Alert Banner */}
+              {vulnAlert && (
+                <div style={{
+                  padding: '10px 24px', flexShrink: 0,
+                  background: vulnAlert.type === 'danger' ? 'rgba(239,68,68,0.12)' : vulnAlert.type === 'safe' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
+                  borderBottom: `2px solid ${vulnAlert.type === 'danger' ? '#ef4444' : vulnAlert.type === 'safe' ? '#10b981' : '#f59e0b'}`,
+                  color: vulnAlert.type === 'danger' ? '#fca5a5' : vulnAlert.type === 'safe' ? '#6ee7b7' : '#fcd34d',
+                  fontSize: '13px', fontWeight: '600',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span>{vulnAlert.message}</span>
+                  {hasSimulation && (
+                    <span style={{ fontSize: '12px', color: 'inherit', opacity: 0.7 }}>
+                      Usa los botones ⏮ ⏭ para explorar la ruta paso a paso
+                    </span>
+                  )}
+                  <button onClick={() => setVulnAlert(null)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>✕</button>
+                </div>
+              )}
+
+              <div className="graph-container" style={{ position: 'relative', height: '100%' }}>
+                {isScanLoading ? (
+                  <div style={{
+                    flex: 1, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    background: '#0f111a', color: '#f3f4f6', gap: '20px', height: '100%',
+                    position: 'relative', zIndex: 10
+                  }}>
+                    <div style={{
+                      width: '48px', height: '48px',
+                      border: '4px solid rgba(99, 102, 241, 0.1)',
+                      borderTop: '4px solid #6366f1',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                      boxShadow: '0 0 15px rgba(99, 102, 241, 0.2)'
+                    }} />
+                    <style dangerouslySetInnerHTML={{__html: `
+                      @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                    `}} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', letterSpacing: '0.5px' }}>
+                        Escaneando Proyecto
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
+                        {directory}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Interactive Breadcrumbs Bar */}
+                    {hasSimulation && tracePath.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        right: '120px',
+                        background: 'rgba(15, 17, 26, 0.9)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid #1f2937',
+                        borderRadius: '30px',
+                        padding: '6px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        zIndex: 20,
+                        overflowX: 'auto',
+                        scrollbarWidth: 'none',
+                        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.5)'
+                      }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '6px', flexShrink: 0 }}>
+                          Ruta del Exploit:
+                        </span>
+                        {tracePath
+                          .map((item, idx) => ({ ...item, originalIndex: idx }))
+                          .filter(item => item.type === 'node')
+                          .map((nodeStep, idx, filteredArray) => {
+                            const isActive = nodeStep.originalIndex === currentStepIndex;
+                            const isSource = idx === 0;
+                            const isSink = idx === filteredArray.length - 1;
+                            
+                            const nameParts = nodeStep.id.split('::');
+                            const filename = nameParts[0].split(/[\\/]/).pop();
+                            const funcname = nameParts[1] ? `${nameParts[1]}()` : '';
+                            
+                            let dotColor = '#9ca3af';
+                            if (isSource) { dotColor = '#6366f1'; }
+                            if (isSink) { dotColor = '#ef4444'; }
+                            
+                            return (
+                              <div key={nodeStep.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                <button
+                                  onClick={() => {
+                                    setCurrentStepIndex(nodeStep.originalIndex);
+                                    jumpToItem(nodeStep);
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '4px 10px',
+                                    background: isActive ? '#6366f1' : '#1f2937',
+                                    border: `1px solid ${isActive ? '#818cf8' : '#374151'}`,
+                                    color: isActive ? '#ffffff' : '#cbd5e1',
+                                    borderRadius: '20px',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontWeight: '600',
+                                    transition: 'all 0.15s',
+                                    outline: 'none',
+                                  }}
+                                  className="breadcrumb-item-button"
+                                >
+                                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dotColor }} />
+                                  <span>{filename}{funcname ? ` ➔ ${funcname}` : ''}</span>
+                                  {isSource && <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.3px', marginLeft: '4px' }}>[Source]</span>}
+                                  {isSink && <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.3px', marginLeft: '4px' }}>[Sink]</span>}
+                                </button>
+                                {idx < filteredArray.length - 1 && (
+                                  <span style={{ color: '#4b5563', fontSize: '12px' }}>➔</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+
+                    {layoutMode === 'sequence' ? (
+                      <SequenceDiagram 
+                        nodes={visibleNodes} 
+                        edges={visibleEdges} 
+                      />
+                    ) : (
+                      <GraphCanvas
+                        nodes={visibleNodes}
+                        edges={visibleEdges}
+                        layoutMode={layoutMode}
+                        highlightedNodeId={highlightedNodeId}
+                        simulatedDataFlow={globalData.dataflow}
+                        onSandboxTest={handleSandboxTest}
+                        onNodeSelect={(fp, nodeId) => { setSelectedFilepath(fp); setHighlightLine(null); setHighlightedNodeId(nodeId); }}
+                        onPaneClick={() => setHighlightedNodeId(null)}
+                        onExpandNode={(id) => setExpandedNodes(p => new Set(p).add(id))}
+                        onCollapseNode={(id) => setExpandedNodes(p => { const s = new Set(p); s.delete(id); return s; })}
+                        onToggleFile={(id) => setCollapsedFiles(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; })}
+                        globalNodes={globalData.nodes}
+                        globalEdges={globalData.edges}
+                        expandedNodes={expandedNodes}
+                        collapsedFiles={collapsedFiles}
+                        onAiExplain={handleAiExplain}
+                        onDataFlowInspect={handleDataFlowInspect}
+                      />
+                    )}
+                    <GraphLegend />
+
+                    {/* Time-Travel Bar */}
+                    {hasSimulation && (
+                      <div style={{
+                        position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+                        background: 'rgba(17,24,39,0.96)', backdropFilter: 'blur(10px)',
+                        padding: '10px 28px', borderRadius: '40px',
+                        border: `1px solid ${isFinalDanger ? '#ef4444' : '#374151'}`,
+                        display: 'flex', gap: '16px', alignItems: 'center',
+                        boxShadow: isFinalDanger ? '0 0 30px rgba(239,68,68,0.4), 0 8px 20px rgba(0,0,0,0.5)' : '0 8px 20px rgba(0,0,0,0.5)',
+                        zIndex: 10,
+                      }}>
+                        <button onClick={handlePrevStep} disabled={currentStepIndex <= -1}
+                          style={{ background: 'transparent', border: 'none', color: currentStepIndex <= -1 ? '#374151' : '#9ca3af', cursor: currentStepIndex <= -1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
+                          <SkipBack size={20} />
+                        </button>
+
+                        <div style={{ textAlign: 'center', minWidth: '140px' }}>
+                          <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>
+                            {isFinalDanger ? '🚨 SINK ALCANZADO' : currentStepIndex < 0 ? '⏱ Pulsa ▶ para avanzar' : '⏱ TIME-TRAVEL'}
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: isFinalDanger ? '#ef4444' : '#f9fafb' }}>
+                            {currentStepIndex < 0 ? `${tracePath.length} pasos disponibles` : `Paso ${currentStepIndex + 1} de ${tracePath.length}`}
+                          </div>
+                        </div>
+
+                        <button onClick={handleNextStep} disabled={currentStepIndex >= tracePath.length - 1}
+                          style={{ background: 'transparent', border: 'none', color: currentStepIndex >= tracePath.length - 1 ? '#374151' : '#9ca3af', cursor: currentStepIndex >= tracePath.length - 1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
+                          <SkipForward size={20} />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Separator */}
+            <div 
+              className="resize-handle-horizontal" 
+              onMouseDown={startResizeRight}
+            />
+
+            {/* Right Panel */}
+            <div 
+              id="right-panel-container"
+              style={{ 
+                width: `${rightPanelWidth}px`, 
+                flexShrink: 0, 
+                minWidth: '280px', 
+                maxWidth: '800px',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Top half: Monaco Code Editor */}
+              <div 
+                id="code-viewer-panel"
+                style={{ 
+                  height: `${topHeightPercent}%`, 
+                  minHeight: '10%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+              >
+                <div className="inspector-top-half" style={{ height: '100%' }}>
+                  {selectedFilepath ? (
+                    <CodeViewer 
+                      filepath={selectedFilepath} 
+                      highlightLine={highlightLine} 
+                      onSaveCode={handleSaveCode} 
+                    />
                   ) : (
-                    <WelcomeScreen />
+                    <div className="empty-code-viewer">
+                      <div style={{ fontSize: '32px', marginBottom: '12px' }}>📄</div>
+                      <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                        Selecciona un archivo o función para ver su código fuente
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
-            </Panel>
-          </Group>
-        ) : (
-          <Group direction="horizontal" key="main-workspace">
-            {/* Panel 1: Sidebar */}
-            <Panel defaultSize={20} minSize={15} maxSize={30} id="sidebar-panel">
-              <Sidebar
-                onScanTrigger={handleScan}
-                loading={isScanLoading}
-                error={scanError}
-                scanResult={scanResult}
-                directory={directory}
-                setDirectory={setDirectory}
-                globalNodes={globalData.nodes}
-                discoveredSources={globalData.discovered_sources}
-                focusedNodeId={focusedNodeId}
-                setFocusedNodeId={(id) => { setFocusedNodeId(id); if (id) setExpandedNodes(p => new Set(p).add(id)); }}
-                onSimulate={handleSimulate}
-                sandboxData={sandboxData}
+
+              {/* Vertical Separator */}
+              <div 
+                className="resize-handle-vertical" 
+                onMouseDown={startResizeVertical}
               />
-            </Panel>
 
-            <Separator className="resize-handle-horizontal" />
-
-            {/* Panel 2: Center Panel (Graph Canvas & Time-Travel) */}
-            <Panel defaultSize={50} minSize={35} id="center-panel">
-              <div className="center-panel">
-                {/* Vuln Alert Banner */}
-                {vulnAlert && (
-                  <div style={{
-                    padding: '10px 24px', flexShrink: 0,
-                    background: vulnAlert.type === 'danger' ? 'rgba(239,68,68,0.12)' : vulnAlert.type === 'safe' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
-                    borderBottom: `2px solid ${vulnAlert.type === 'danger' ? '#ef4444' : vulnAlert.type === 'safe' ? '#10b981' : '#f59e0b'}`,
-                    color: vulnAlert.type === 'danger' ? '#fca5a5' : vulnAlert.type === 'safe' ? '#6ee7b7' : '#fcd34d',
-                    fontSize: '13px', fontWeight: '600',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <span>{vulnAlert.message}</span>
-                    {hasSimulation && (
-                      <span style={{ fontSize: '12px', color: 'inherit', opacity: 0.7 }}>
-                        Usa los botones ⏮ ⏭ para explorar la ruta paso a paso
+              {/* Bottom half: Tabs */}
+              <div 
+                id="inspector-tabs-panel"
+                style={{ 
+                  flex: 1, 
+                  minHeight: '10%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+              >
+                <div className="inspector-bottom-half" style={{ height: '100%' }}>
+                  <div style={{ display: 'flex', background: '#0a0c14', borderBottom: '1px solid #1f2937', flexShrink: 0 }}>
+                    {[
+                      { id: 'dataflow',    label: '🔍 Flujo de Datos', color: '#60a5fa' },
+                      { id: 'connections', label: '🔗 Conexiones',     color: '#a78bfa' },
+                    ].map(tab => (
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                        padding: '10px 20px', background: activeTab === tab.id ? '#1a1d27' : 'transparent',
+                        color: tab.color, border: 'none',
+                        borderBottom: activeTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: '600', transition: 'all 0.2s'
+                      }}>{tab.label}</button>
+                    ))}
+                    {activeTab === 'connections' && (
+                      <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#6b7280' }}>
+                        Matriz/Árbol de relaciones
                       </span>
                     )}
-                    <button onClick={() => setVulnAlert(null)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>✕</button>
-                  </div>
-                )}
-
-                <div className="graph-container" style={{ position: 'relative', height: '100%' }}>
-                  {isScanLoading ? (
-                    <div style={{
-                      flex: 1, display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      background: '#0f111a', color: '#f3f4f6', gap: '20px', height: '100%',
-                      position: 'relative', zIndex: 10
-                    }}>
-                      <div style={{
-                        width: '48px', height: '48px',
-                        border: '4px solid rgba(99, 102, 241, 0.1)',
-                        borderTop: '4px solid #6366f1',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                        boxShadow: '0 0 15px rgba(99, 102, 241, 0.2)'
-                      }} />
-                      <style dangerouslySetInnerHTML={{__html: `
-                        @keyframes spin {
-                          0% { transform: rotate(0deg); }
-                          100% { transform: rotate(360deg); }
+                    {activeTab === 'dataflow' && (
+                      <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#4b5563' }}>
+                        {useGlobalFlow && simulatedDataFlow
+                          ? 'Rastro Global de Simulación'
+                          : (dataFlowNodeId?.includes('::') ? `Rastreando: ${dataFlowNodeId.split('::')[1]}()` : 'Haz clic derecho en una función → 🔍 Rastrear Flujo')
                         }
-                      `}} />
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', letterSpacing: '0.5px' }}>
-                          Escaneando Proyecto
-                        </span>
-                        <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
-                          {directory}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {layoutMode === 'sequence' ? (
-                        <SequenceDiagram 
-                          nodes={visibleNodes} 
-                          edges={visibleEdges} 
-                        />
-                      ) : (
-                        <GraphCanvas
-                          nodes={visibleNodes}
-                          edges={visibleEdges}
-                          layoutMode={layoutMode}
-                          highlightedNodeId={highlightedNodeId}
-                          simulatedDataFlow={globalData.dataflow}
-                          onSandboxTest={handleSandboxTest}
-                          onNodeSelect={(fp, nodeId) => { setSelectedFilepath(fp); setHighlightLine(null); setHighlightedNodeId(nodeId); }}
-                          onPaneClick={() => setHighlightedNodeId(null)}
-                          onExpandNode={(id) => setExpandedNodes(p => new Set(p).add(id))}
-                          onCollapseNode={(id) => setExpandedNodes(p => { const s = new Set(p); s.delete(id); return s; })}
-                          onToggleFile={(id) => setCollapsedFiles(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; })}
-                          globalNodes={globalData.nodes}
-                          globalEdges={globalData.edges}
-                          expandedNodes={expandedNodes}
-                          collapsedFiles={collapsedFiles}
-                          onAiExplain={handleAiExplain}
-                          onDataFlowInspect={handleDataFlowInspect}
-                        />
-                      )}
-                      <GraphLegend />
-
-                      {/* Time-Travel Bar */}
-                      {hasSimulation && (
-                        <div style={{
-                          position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-                          background: 'rgba(17,24,39,0.96)', backdropFilter: 'blur(10px)',
-                          padding: '10px 28px', borderRadius: '40px',
-                          border: `1px solid ${isFinalDanger ? '#ef4444' : '#374151'}`,
-                          display: 'flex', gap: '16px', alignItems: 'center',
-                          boxShadow: isFinalDanger ? '0 0 30px rgba(239,68,68,0.4), 0 8px 20px rgba(0,0,0,0.5)' : '0 8px 20px rgba(0,0,0,0.5)',
-                          zIndex: 10,
-                        }}>
-                          <button onClick={handlePrevStep} disabled={currentStepIndex <= -1}
-                            style={{ background: 'transparent', border: 'none', color: currentStepIndex <= -1 ? '#374151' : '#9ca3af', cursor: currentStepIndex <= -1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
-                            <SkipBack size={20} />
-                          </button>
-
-                          <div style={{ textAlign: 'center', minWidth: '140px' }}>
-                            <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>
-                              {isFinalDanger ? '🚨 SINK ALCANZADO' : currentStepIndex < 0 ? '⏱ Pulsa ▶ para avanzar' : '⏱ TIME-TRAVEL'}
-                            </div>
-                            <div style={{ fontSize: '14px', fontWeight: '700', color: isFinalDanger ? '#ef4444' : '#f9fafb' }}>
-                              {currentStepIndex < 0 ? `${tracePath.length} pasos disponibles` : `Paso ${currentStepIndex + 1} de ${tracePath.length}`}
-                            </div>
-                          </div>
-
-                          <button onClick={handleNextStep} disabled={currentStepIndex >= tracePath.length - 1}
-                            style={{ background: 'transparent', border: 'none', color: currentStepIndex >= tracePath.length - 1 ? '#374151' : '#9ca3af', cursor: currentStepIndex >= tracePath.length - 1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
-                            <SkipForward size={20} />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                    {activeTab === 'connections' && (
+                      <ConnectionExplorer
+                        nodes={globalData.nodes}
+                        edges={globalData.edges}
+                        onSelectNode={handleSelectNode}
+                        onSelectFile={(fileId) => { setSelectedFilepath(fileId); }}
+                        onAiExplain={handleAiExplain}
+                        onDataFlowInspect={handleDataFlowInspect}
+                        onSandboxTest={handleSandboxTest}
+                      />
+                    )}
+                    {activeTab === 'dataflow' && (
+                      <DataFlowInspector
+                        nodeId={dataFlowNodeId}
+                        directory={directory}
+                        simulatedSteps={simulatedDataFlow}
+                        useGlobalFlow={useGlobalFlow}
+                        setUseGlobalFlow={setUseGlobalFlow}
+                        preloadedData={sandboxData}
+                        onNavigate={(target) => {
+                          const parts = target.split('::');
+                          const fp = parts[0];
+                          setSelectedFilepath(fp);
+                          const n = globalData.nodes.find(x => x.id === target);
+                          if (n) setHighlightLine(n.line_number || null);
+                        }}
+                        onSelectLine={(line) => {
+                          if (line) setHighlightLine(line);
+                        }}
+                        onSelectFileAndLine={handleSelectFileAndLine}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            </Panel>
-
-            <Separator className="resize-handle-horizontal" />
-
-            {/* Panel 3: Right Panel (Split vertically: Monaco top, Tabs bottom) */}
-            <Panel defaultSize={30} minSize={20} maxSize={50} id="right-panel">
-              <div className="right-panel">
-                <Group direction="vertical">
-                  {/* Top half: Monaco Code Editor */}
-                  <Panel defaultSize={55} minSize={20} id="code-viewer-panel">
-                    <div className="inspector-top-half" style={{ height: '100%' }}>
-                      {selectedFilepath ? (
-                        <CodeViewer 
-                          filepath={selectedFilepath} 
-                          highlightLine={highlightLine} 
-                          onSaveCode={handleSaveCode} 
-                        />
-                      ) : (
-                        <div className="empty-code-viewer">
-                          <div style={{ fontSize: '32px', marginBottom: '12px' }}>📄</div>
-                          <p style={{ fontSize: '13px', color: '#6b7280' }}>
-                            Selecciona un archivo o función para ver su código fuente
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </Panel>
-
-                  <Separator className="resize-handle-vertical" />
-
-                  {/* Bottom half: Tabs */}
-                  <Panel defaultSize={45} minSize={20} id="inspector-tabs-panel">
-                    <div className="inspector-bottom-half" style={{ height: '100%' }}>
-                      <div style={{ display: 'flex', background: '#0a0c14', borderBottom: '1px solid #1f2937', flexShrink: 0 }}>
-                        {[
-                          { id: 'dataflow',    label: '🔍 Flujo de Datos', color: '#60a5fa' },
-                          { id: 'connections', label: '🔗 Conexiones',     color: '#a78bfa' },
-                        ].map(tab => (
-                          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                            padding: '10px 20px', background: activeTab === tab.id ? '#1a1d27' : 'transparent',
-                            color: tab.color, border: 'none',
-                            borderBottom: activeTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
-                            cursor: 'pointer', fontSize: '12px', fontWeight: '600', transition: 'all 0.2s'
-                          }}>{tab.label}</button>
-                        ))}
-                        {activeTab === 'connections' && (
-                          <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#6b7280' }}>
-                            Matriz/Árbol de relaciones
-                          </span>
-                        )}
-                        {activeTab === 'dataflow' && (
-                          <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#4b5563' }}>
-                            {useGlobalFlow && simulatedDataFlow
-                              ? 'Rastro Global de Simulación'
-                              : (dataFlowNodeId?.includes('::') ? `Rastreando: ${dataFlowNodeId.split('::')[1]}()` : 'Haz clic derecho en una función → 🔍 Rastrear Flujo')
-                            }
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-                        {activeTab === 'connections' && (
-                          <ConnectionExplorer
-                            nodes={globalData.nodes}
-                            edges={globalData.edges}
-                            onSelectNode={handleSelectNode}
-                            onSelectFile={(fileId) => { setSelectedFilepath(fileId); }}
-                            onAiExplain={handleAiExplain}
-                            onDataFlowInspect={handleDataFlowInspect}
-                            onSandboxTest={handleSandboxTest}
-                          />
-                        )}
-                        {activeTab === 'dataflow' && (
-                          <DataFlowInspector
-                            nodeId={dataFlowNodeId}
-                            directory={directory}
-                            simulatedSteps={simulatedDataFlow}
-                            useGlobalFlow={useGlobalFlow}
-                            setUseGlobalFlow={setUseGlobalFlow}
-                            preloadedData={sandboxData}
-                            onNavigate={(target) => {
-                              const parts = target.split('::');
-                              const fp = parts[0];
-                              setSelectedFilepath(fp);
-                              const n = globalData.nodes.find(x => x.id === target);
-                              if (n) setHighlightLine(n.line_number || null);
-                            }}
-                            onSelectLine={(line) => {
-                              if (line) setHighlightLine(line);
-                            }}
-                            onSelectFileAndLine={handleSelectFileAndLine}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </Panel>
-                </Group>
-              </div>
-            </Panel>
-          </Group>
+            </div>
+          </>
         )}
       </div>
 

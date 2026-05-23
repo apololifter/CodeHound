@@ -133,17 +133,44 @@ export function Sidebar({
           <label style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginBottom: '5px' }}>
             Ruta del proyecto
           </label>
-          <input
-            type="text"
-            value={directory}
-            onChange={e => setDirectory(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && onScanTrigger(directory)}
-            placeholder="C:/mi-proyecto"
-            style={{
-              width: '100%', padding: '9px 12px', background: '#0f111a', color: '#f3f4f6',
-              border: '1px solid #374151', borderRadius: '6px', fontSize: '12px', outline: 'none'
-            }}
-          />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              type="text"
+              value={directory}
+              onChange={e => setDirectory(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && onScanTrigger(directory)}
+              placeholder="C:/mi-proyecto"
+              style={{
+                flex: 1, padding: '9px 12px', background: '#0f111a', color: '#f3f4f6',
+                border: '1px solid #374151', borderRadius: '6px', fontSize: '12px', outline: 'none',
+                minWidth: 0
+              }}
+            />
+            <button
+              onClick={async (e) => {
+                e.preventDefault();
+                try {
+                  const res = await fetch('http://127.0.0.1:8000/api/browse');
+                  const data = await res.json();
+                  if (data.directory) {
+                    setDirectory(data.directory);
+                  }
+                } catch (err) {
+                  console.error('Error al explorar directorio:', err);
+                }
+              }}
+              style={{
+                background: '#1f2937', color: '#f3f4f6', border: '1px solid #374151',
+                padding: '0 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s'
+              }}
+              title="Abrir explorador de carpetas"
+              onMouseEnter={evt => { evt.currentTarget.style.borderColor = '#6366f1'; }}
+              onMouseLeave={evt => { evt.currentTarget.style.borderColor = '#374151'; }}
+            >
+              📁
+            </button>
+          </div>
         </div>
 
         <button

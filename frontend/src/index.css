@@ -366,3 +366,34 @@ body {
   border-radius: 8px !important;
   border: 1px solid #374151 !important;
 }
+
+/* ═══════════════════════════════════════════════════════
+   Parent File Container Styling (Compound Nodes)
+═══════════════════════════════════════════════════════ */
+.custom-node.file-container {
+  max-width: none !important;
+  min-width: 240px !important;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(26, 29, 39, 0.4) !important;
+  border: 2px dashed rgba(99, 102, 241, 0.45) !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  display: flex;
+  flex-direction: column;
+  padding: 16px !important;
+  cursor: default;
+  z-index: 1;
+}
+
+.custom-node.file-container:hover {
+  border-color: rgba(99, 102, 241, 0.8) !important;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15) !important;
+  transform: none !important; /* Do not scale parent file container */
+}
+
+.custom-node.file-container.selected {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4), 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  transform: none !important;
+}
