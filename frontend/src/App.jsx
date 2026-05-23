@@ -8,6 +8,8 @@ import { DataFlowInspector } from './components/DataFlowInspector';
 import { SequenceDiagram } from './components/SequenceDiagram';
 import { SandboxModal } from './components/SandboxModal';
 import { SkipBack, SkipForward } from 'lucide-react';
+import { Group, Panel, Separator } from 'react-resizable-panels';
+import { Rnd } from 'react-rnd';
 
 function formatAiExplanation(text, onSelectLine) {
   if (!text) return null;
@@ -319,6 +321,7 @@ function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [highlightLine, setHighlightLine] = useState(null);
   const [dataFlowNodeId, setDataFlowNodeId] = useState(null); // node being inspected in DataFlow tab
+  const [showAiHud, setShowAiHud] = useState(false);
 
   const [simulatedEdges, setSimulatedEdges] = useState({});
   const [inactiveNodes, setInactiveNodes] = useState([]);
@@ -469,7 +472,7 @@ function App() {
   };
 
   const handleAiExplain = async (nodeId) => {
-    setActiveTab('ai');
+    setShowAiHud(true);
     setIsAiLoading(true);
     setAiExplanation('Analizando con IA...');
     try {
@@ -566,7 +569,28 @@ function App() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {hasScanned && (
+            <button 
+              onClick={() => setShowAiHud(!showAiHud)} 
+              style={{ 
+                background: showAiHud ? 'rgba(99, 102, 241, 0.2)' : '#374151', 
+                color: showAiHud ? '#818cf8' : '#f9fafb', 
+                border: `1px solid ${showAiHud ? '#6366f1' : '#4b5563'}`, 
+                padding: '6px 14px', 
+                borderRadius: '6px', 
+                cursor: 'pointer', 
+                fontSize: '12px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s'
+              }}
+            >
+              🪄 Asistente IA
+            </button>
+          )}
           {hasScanned && (
             <select
               value={layoutMode}
@@ -592,244 +616,347 @@ function App() {
       </header>
 
       <div className="main-content">
-        <Sidebar
-          onScanTrigger={handleScan}
-          loading={isScanLoading}
-          error={scanError}
-          scanResult={scanResult}
-          directory={directory}
-          setDirectory={setDirectory}
-          globalNodes={globalData.nodes}
-          discoveredSources={globalData.discovered_sources}
-          focusedNodeId={focusedNodeId}
-          setFocusedNodeId={(id) => { setFocusedNodeId(id); if (id) setExpandedNodes(p => new Set(p).add(id)); }}
-          onSimulate={handleSimulate}
-          sandboxData={sandboxData}
-        />
+        <Group direction="horizontal">
+          {/* Panel 1: Sidebar */}
+          <Panel defaultSize={20} minSize={15} maxSize={30} id="sidebar-panel">
+            <Sidebar
+              onScanTrigger={handleScan}
+              loading={isScanLoading}
+              error={scanError}
+              scanResult={scanResult}
+              directory={directory}
+              setDirectory={setDirectory}
+              globalNodes={globalData.nodes}
+              discoveredSources={globalData.discovered_sources}
+              focusedNodeId={focusedNodeId}
+              setFocusedNodeId={(id) => { setFocusedNodeId(id); if (id) setExpandedNodes(p => new Set(p).add(id)); }}
+              onSimulate={handleSimulate}
+              sandboxData={sandboxData}
+            />
+          </Panel>
 
-        {/* Center Panel: Graph Canvas & Time-Travel */}
-        <div className="center-panel">
-          {/* Vuln Alert Banner */}
-          {vulnAlert && (
-            <div style={{
-              padding: '10px 24px', flexShrink: 0,
-              background: vulnAlert.type === 'danger' ? 'rgba(239,68,68,0.12)' : vulnAlert.type === 'safe' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
-              borderBottom: `2px solid ${vulnAlert.type === 'danger' ? '#ef4444' : vulnAlert.type === 'safe' ? '#10b981' : '#f59e0b'}`,
-              color: vulnAlert.type === 'danger' ? '#fca5a5' : vulnAlert.type === 'safe' ? '#6ee7b7' : '#fcd34d',
-              fontSize: '13px', fontWeight: '600',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <span>{vulnAlert.message}</span>
-              {hasSimulation && (
-                <span style={{ fontSize: '12px', color: 'inherit', opacity: 0.7 }}>
-                  Usa los botones ⏮ ⏭ para explorar la ruta paso a paso
-                </span>
-              )}
-              <button onClick={() => setVulnAlert(null)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>✕</button>
-            </div>
-          )}
+          <Separator className="resize-handle-horizontal" />
 
-          <div className="graph-container" style={{ position: 'relative' }}>
-            {isScanLoading ? (
-              <div style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                background: '#0f111a', color: '#f3f4f6', gap: '20px', height: '100%',
-                position: 'relative', zIndex: 10
-              }}>
+          {/* Panel 2: Center Panel (Graph Canvas & Time-Travel) */}
+          <Panel defaultSize={50} minSize={35} id="center-panel">
+            <div className="center-panel">
+              {/* Vuln Alert Banner */}
+              {vulnAlert && (
                 <div style={{
-                  width: '48px', height: '48px',
-                  border: '4px solid rgba(99, 102, 241, 0.1)',
-                  borderTop: '4px solid #6366f1',
+                  padding: '10px 24px', flexShrink: 0,
+                  background: vulnAlert.type === 'danger' ? 'rgba(239,68,68,0.12)' : vulnAlert.type === 'safe' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)',
+                  borderBottom: `2px solid ${vulnAlert.type === 'danger' ? '#ef4444' : vulnAlert.type === 'safe' ? '#10b981' : '#f59e0b'}`,
+                  color: vulnAlert.type === 'danger' ? '#fca5a5' : vulnAlert.type === 'safe' ? '#6ee7b7' : '#fcd34d',
+                  fontSize: '13px', fontWeight: '600',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span>{vulnAlert.message}</span>
+                  {hasSimulation && (
+                    <span style={{ fontSize: '12px', color: 'inherit', opacity: 0.7 }}>
+                      Usa los botones ⏮ ⏭ para explorar la ruta paso a paso
+                    </span>
+                  )}
+                  <button onClick={() => setVulnAlert(null)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>✕</button>
+                </div>
+              )}
+
+              <div className="graph-container" style={{ position: 'relative', height: '100%' }}>
+                {isScanLoading ? (
+                  <div style={{
+                    flex: 1, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    background: '#0f111a', color: '#f3f4f6', gap: '20px', height: '100%',
+                    position: 'relative', zIndex: 10
+                  }}>
+                    <div style={{
+                      width: '48px', height: '48px',
+                      border: '4px solid rgba(99, 102, 241, 0.1)',
+                      borderTop: '4px solid #6366f1',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                      boxShadow: '0 0 15px rgba(99, 102, 241, 0.2)'
+                    }} />
+                    <style dangerouslySetInnerHTML={{__html: `
+                      @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                    `}} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', letterSpacing: '0.5px' }}>
+                        Escaneando Proyecto
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
+                        {directory}
+                      </span>
+                    </div>
+                  </div>
+                ) : !hasScanned ? (
+                  <WelcomeScreen />
+                ) : (
+                  <>
+                    {layoutMode === 'sequence' ? (
+                      <SequenceDiagram 
+                        nodes={visibleNodes} 
+                        edges={visibleEdges} 
+                      />
+                    ) : (
+                      <GraphCanvas
+                        nodes={visibleNodes}
+                        edges={visibleEdges}
+                        layoutMode={layoutMode}
+                        highlightedNodeId={highlightedNodeId}
+                        simulatedDataFlow={globalData.dataflow}
+                        onSandboxTest={handleSandboxTest}
+                        onNodeSelect={(fp, nodeId) => { setSelectedFilepath(fp); setHighlightLine(null); setHighlightedNodeId(nodeId); }}
+                        onPaneClick={() => setHighlightedNodeId(null)}
+                        onExpandNode={(id) => setExpandedNodes(p => new Set(p).add(id))}
+                        onCollapseNode={(id) => setExpandedNodes(p => { const s = new Set(p); s.delete(id); return s; })}
+                        onToggleFile={(id) => setCollapsedFiles(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; })}
+                        globalNodes={globalData.nodes}
+                        globalEdges={globalData.edges}
+                        expandedNodes={expandedNodes}
+                        collapsedFiles={collapsedFiles}
+                        onAiExplain={handleAiExplain}
+                        onDataFlowInspect={handleDataFlowInspect}
+                      />
+                    )}
+                    <GraphLegend />
+
+                    {/* Time-Travel Bar */}
+                    {hasSimulation && (
+                      <div style={{
+                        position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+                        background: 'rgba(17,24,39,0.96)', backdropFilter: 'blur(10px)',
+                        padding: '10px 28px', borderRadius: '40px',
+                        border: `1px solid ${isFinalDanger ? '#ef4444' : '#374151'}`,
+                        display: 'flex', gap: '16px', alignItems: 'center',
+                        boxShadow: isFinalDanger ? '0 0 30px rgba(239,68,68,0.4), 0 8px 20px rgba(0,0,0,0.5)' : '0 8px 20px rgba(0,0,0,0.5)',
+                        zIndex: 10,
+                      }}>
+                        <button onClick={handlePrevStep} disabled={currentStepIndex <= -1}
+                          style={{ background: 'transparent', border: 'none', color: currentStepIndex <= -1 ? '#374151' : '#9ca3af', cursor: currentStepIndex <= -1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
+                          <SkipBack size={20} />
+                        </button>
+
+                        <div style={{ textAlign: 'center', minWidth: '140px' }}>
+                          <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>
+                            {isFinalDanger ? '🚨 SINK ALCANZADO' : currentStepIndex < 0 ? '⏱ Pulsa ▶ para avanzar' : '⏱ TIME-TRAVEL'}
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: isFinalDanger ? '#ef4444' : '#f9fafb' }}>
+                            {currentStepIndex < 0 ? `${tracePath.length} pasos disponibles` : `Paso ${currentStepIndex + 1} de ${tracePath.length}`}
+                          </div>
+                        </div>
+
+                        <button onClick={handleNextStep} disabled={currentStepIndex >= tracePath.length - 1}
+                          style={{ background: 'transparent', border: 'none', color: currentStepIndex >= tracePath.length - 1 ? '#374151' : '#9ca3af', cursor: currentStepIndex >= tracePath.length - 1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
+                          <SkipForward size={20} />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </Panel>
+
+          {/* Panel 3: Right Panel (Split vertically: Monaco top, Tabs bottom) */}
+          {hasScanned && (
+            <>
+              <Separator className="resize-handle-horizontal" />
+              <Panel defaultSize={30} minSize={20} maxSize={50} id="right-panel">
+                <div className="right-panel">
+                  <Group direction="vertical">
+                    {/* Top half: Monaco Code Editor */}
+                    <Panel defaultSize={55} minSize={20} id="code-viewer-panel">
+                      <div className="inspector-top-half" style={{ height: '100%' }}>
+                        {selectedFilepath ? (
+                          <CodeViewer 
+                            filepath={selectedFilepath} 
+                            highlightLine={highlightLine} 
+                            onSaveCode={handleSaveCode} 
+                          />
+                        ) : (
+                          <div className="empty-code-viewer">
+                            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📄</div>
+                            <p style={{ fontSize: '13px', color: '#6b7280' }}>
+                              Selecciona un archivo o función para ver su código fuente
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Panel>
+
+                    <Separator className="resize-handle-vertical" />
+
+                    {/* Bottom half: Tabs */}
+                    <Panel defaultSize={45} minSize={20} id="inspector-tabs-panel">
+                      <div className="inspector-bottom-half" style={{ height: '100%' }}>
+                        <div style={{ display: 'flex', background: '#0a0c14', borderBottom: '1px solid #1f2937', flexShrink: 0 }}>
+                          {[
+                            { id: 'dataflow',    label: '🔍 Flujo de Datos', color: '#60a5fa' },
+                            { id: 'connections', label: '🔗 Conexiones',     color: '#a78bfa' },
+                          ].map(tab => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                              padding: '10px 20px', background: activeTab === tab.id ? '#1a1d27' : 'transparent',
+                              color: tab.color, border: 'none',
+                              borderBottom: activeTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
+                              cursor: 'pointer', fontSize: '12px', fontWeight: '600', transition: 'all 0.2s'
+                            }}>{tab.label}</button>
+                          ))}
+                          {activeTab === 'connections' && (
+                            <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#6b7280' }}>
+                              Matriz/Árbol de relaciones
+                            </span>
+                          )}
+                          {activeTab === 'dataflow' && (
+                            <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#4b5563' }}>
+                              {useGlobalFlow && simulatedDataFlow
+                                ? 'Rastro Global de Simulación'
+                                : (dataFlowNodeId?.includes('::') ? `Rastreando: ${dataFlowNodeId.split('::')[1]}()` : 'Haz clic derecho en una función → 🔍 Rastrear Flujo')
+                              }
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                          {activeTab === 'connections' && (
+                            <ConnectionExplorer
+                              nodes={globalData.nodes}
+                              edges={globalData.edges}
+                              onSelectNode={handleSelectNode}
+                              onSelectFile={(fileId) => { setSelectedFilepath(fileId); }}
+                              onAiExplain={handleAiExplain}
+                              onDataFlowInspect={handleDataFlowInspect}
+                              onSandboxTest={handleSandboxTest}
+                            />
+                          )}
+                          {activeTab === 'dataflow' && (
+                            <DataFlowInspector
+                              nodeId={dataFlowNodeId}
+                              directory={directory}
+                              simulatedSteps={simulatedDataFlow}
+                              useGlobalFlow={useGlobalFlow}
+                              setUseGlobalFlow={setUseGlobalFlow}
+                              preloadedData={sandboxData}
+                              onNavigate={(target) => {
+                                const parts = target.split('::');
+                                const fp = parts[0];
+                                setSelectedFilepath(fp);
+                                const n = globalData.nodes.find(x => x.id === target);
+                                if (n) setHighlightLine(n.line_number || null);
+                              }}
+                              onSelectLine={(line) => {
+                                if (line) setHighlightLine(line);
+                              }}
+                              onSelectFileAndLine={handleSelectFileAndLine}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </Panel>
+                  </Group>
+                </div>
+              </Panel>
+            </>
+          )}
+        </Group>
+      </div>
+
+      {/* Floating HUD AI Assistant Panel */}
+      {showAiHud && (
+        <Rnd
+          default={{
+            x: window.innerWidth - 460,
+            y: 80,
+            width: 420,
+            height: 520,
+          }}
+          minWidth={320}
+          minHeight={300}
+          bounds="window"
+          dragHandleClassName="hud-drag-handle"
+          style={{
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'rgba(15, 17, 26, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(99, 102, 241, 0.3)',
+            borderRadius: '12px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)',
+            overflow: 'hidden'
+          }}
+        >
+          {/* HUD Header */}
+          <div 
+            className="hud-drag-handle" 
+            style={{
+              padding: '12px 16px',
+              background: 'rgba(99, 102, 241, 0.15)',
+              borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'move',
+              userSelect: 'none',
+              flexShrink: 0
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>🪄</span>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#818cf8', letterSpacing: '0.5px' }}>
+                Asistente de IA (CodeXHound)
+              </span>
+            </div>
+            <button 
+              onClick={() => setShowAiHud(false)} 
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+                transition: 'background 0.2s, color 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = '#ef4444'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* HUD Content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', color: '#cbd5e1' }}>
+            {isAiLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', color: '#9ca3af' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  border: '3px solid rgba(99, 102, 241, 0.1)',
+                  borderTop: '3px solid #6366f1',
                   borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite',
-                  boxShadow: '0 0 15px rgba(99, 102, 241, 0.2)'
                 }} />
-                <style dangerouslySetInnerHTML={{__html: `
-                  @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                  }
-                `}} />
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '600', color: '#e2e8f0', letterSpacing: '0.5px' }}>
-                    Escaneando Proyecto
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
-                    {directory}
-                  </span>
-                </div>
+                <span style={{ fontSize: '13px' }}>Analizando lógica con IA...</span>
               </div>
-            ) : !hasScanned ? (
-              <WelcomeScreen />
+            ) : aiExplanation ? (
+              formatAiExplanation(aiExplanation, (line) => setHighlightLine(line))
             ) : (
-              <>
-                {layoutMode === 'sequence' ? (
-                  <SequenceDiagram 
-                    nodes={visibleNodes} 
-                    edges={visibleEdges} 
-                  />
-                ) : (
-                  <GraphCanvas
-                    nodes={visibleNodes}
-                    edges={visibleEdges}
-                    layoutMode={layoutMode}
-                    highlightedNodeId={highlightedNodeId}
-                    simulatedDataFlow={globalData.dataflow}
-                    onSandboxTest={handleSandboxTest}
-                    onNodeSelect={(fp, nodeId) => { setSelectedFilepath(fp); setHighlightLine(null); setHighlightedNodeId(nodeId); }}
-                    onPaneClick={() => setHighlightedNodeId(null)}
-                    onExpandNode={(id) => setExpandedNodes(p => new Set(p).add(id))}
-                    onCollapseNode={(id) => setExpandedNodes(p => { const s = new Set(p); s.delete(id); return s; })}
-                    onToggleFile={(id) => setCollapsedFiles(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; })}
-                    globalNodes={globalData.nodes}
-                    globalEdges={globalData.edges}
-                    expandedNodes={expandedNodes}
-                    collapsedFiles={collapsedFiles}
-                    onAiExplain={handleAiExplain}
-                    onDataFlowInspect={handleDataFlowInspect}
-                  />
-                )}
-                <GraphLegend />
-
-                {/* Time-Travel Bar */}
-                {hasSimulation && (
-                  <div style={{
-                    position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-                    background: 'rgba(17,24,39,0.96)', backdropFilter: 'blur(10px)',
-                    padding: '10px 28px', borderRadius: '40px',
-                    border: `1px solid ${isFinalDanger ? '#ef4444' : '#374151'}`,
-                    display: 'flex', gap: '16px', alignItems: 'center',
-                    boxShadow: isFinalDanger ? '0 0 30px rgba(239,68,68,0.4), 0 8px 20px rgba(0,0,0,0.5)' : '0 8px 20px rgba(0,0,0,0.5)',
-                    zIndex: 10,
-                  }}>
-                    <button onClick={handlePrevStep} disabled={currentStepIndex <= -1}
-                      style={{ background: 'transparent', border: 'none', color: currentStepIndex <= -1 ? '#374151' : '#9ca3af', cursor: currentStepIndex <= -1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
-                      <SkipBack size={20} />
-                    </button>
-
-                    <div style={{ textAlign: 'center', minWidth: '140px' }}>
-                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>
-                        {isFinalDanger ? '🚨 SINK ALCANZADO' : currentStepIndex < 0 ? '⏱ Pulsa ▶ para avanzar' : '⏱ TIME-TRAVEL'}
-                      </div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: isFinalDanger ? '#ef4444' : '#f9fafb' }}>
-                        {currentStepIndex < 0 ? `${tracePath.length} pasos disponibles` : `Paso ${currentStepIndex + 1} de ${tracePath.length}`}
-                      </div>
-                    </div>
-
-                    <button onClick={handleNextStep} disabled={currentStepIndex >= tracePath.length - 1}
-                      style={{ background: 'transparent', border: 'none', color: currentStepIndex >= tracePath.length - 1 ? '#374151' : '#9ca3af', cursor: currentStepIndex >= tracePath.length - 1 ? 'not-allowed' : 'pointer', display: 'flex' }}>
-                      <SkipForward size={20} />
-                    </button>
-                  </div>
-                )}
-              </>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', gap: '8px', color: '#6b7280', padding: '0 20px' }}>
+                <div style={{ fontSize: '40px' }}>🤖</div>
+                <span style={{ fontSize: '13px' }}>
+                  Haz clic derecho en cualquier nodo de función y selecciona **"🪄 Explicar Lógica (IA)"** para recibir un reporte completo en tiempo real.
+                </span>
+              </div>
             )}
           </div>
-        </div>
-
-        {/* Right Panel: Split Inspector (Monaco top, Tabs bottom) */}
-        {hasScanned && (
-          <div className="right-panel">
-            {/* Top Half: Monaco Code Editor */}
-            <div className="inspector-top-half">
-              {selectedFilepath ? (
-                <CodeViewer 
-                  filepath={selectedFilepath} 
-                  highlightLine={highlightLine} 
-                  onSaveCode={handleSaveCode} 
-                />
-              ) : (
-                <div className="empty-code-viewer">
-                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>📄</div>
-                  <p style={{ fontSize: '13px', color: '#6b7280' }}>
-                    Selecciona un archivo o función para ver su código fuente
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Half: Tabs */}
-            <div className="inspector-bottom-half">
-              <div style={{ display: 'flex', background: '#0a0c14', borderBottom: '1px solid #1f2937', flexShrink: 0 }}>
-                {[
-                  { id: 'dataflow',    label: '🔍 Flujo de Datos', color: '#60a5fa' },
-                  { id: 'connections', label: '🔗 Conexiones',     color: '#a78bfa' },
-                  { id: 'ai',          label: '🪄 Análisis IA',    color: '#10b981' },
-                ].map(tab => (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                    padding: '10px 20px', background: activeTab === tab.id ? '#1a1d27' : 'transparent',
-                    color: tab.color, border: 'none',
-                    borderBottom: activeTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
-                    cursor: 'pointer', fontSize: '12px', fontWeight: '600', transition: 'all 0.2s'
-                  }}>{tab.label}</button>
-                ))}
-                {activeTab === 'connections' && (
-                  <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#6b7280' }}>
-                    Matriz/Árbol de relaciones
-                  </span>
-                )}
-                {activeTab === 'dataflow' && (
-                  <span style={{ marginLeft: '12px', alignSelf: 'center', fontSize: '12px', color: '#4b5563' }}>
-                    {useGlobalFlow && simulatedDataFlow
-                      ? 'Rastro Global de Simulación'
-                      : (dataFlowNodeId?.includes('::') ? `Rastreando: ${dataFlowNodeId.split('::')[1]}()` : 'Haz clic derecho en una función → 🔍 Rastrear Flujo')
-                    }
-                  </span>
-                )}
-              </div>
-              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-                {activeTab === 'ai' && (
-                  <div style={{ padding: '20px', color: '#cbd5e1', height: '100%', overflowY: 'auto' }}>
-                    {isAiLoading ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6b7280' }}>
-                        <span style={{ fontSize: '16px', animation: 'spin 1s linear infinite' }}>⏳</span>
-                        <span>Analizando con IA...</span>
-                      </div>
-                    ) : aiExplanation ? (
-                      formatAiExplanation(aiExplanation, (line) => setHighlightLine(line))
-                    ) : (
-                      <span style={{ color: '#4b5563' }}>Haz clic derecho en un nodo del grafo → "🪄 Explicar Lógica (IA)"</span>
-                    )}
-                  </div>
-                )}
-                {activeTab === 'connections' && (
-                  <ConnectionExplorer
-                    nodes={globalData.nodes}
-                    edges={globalData.edges}
-                    onSelectNode={handleSelectNode}
-                    onSelectFile={(fileId) => { setSelectedFilepath(fileId); }}
-                    onAiExplain={handleAiExplain}
-                    onDataFlowInspect={handleDataFlowInspect}
-                    onSandboxTest={handleSandboxTest}
-                  />
-                )}
-                {activeTab === 'dataflow' && (
-                  <DataFlowInspector
-                    nodeId={dataFlowNodeId}
-                    directory={directory}
-                    simulatedSteps={simulatedDataFlow}
-                    useGlobalFlow={useGlobalFlow}
-                    setUseGlobalFlow={setUseGlobalFlow}
-                    preloadedData={sandboxData}
-                    onNavigate={(target) => {
-                      const parts = target.split('::');
-                      const fp = parts[0];
-                      setSelectedFilepath(fp);
-                      const n = globalData.nodes.find(x => x.id === target);
-                      if (n) setHighlightLine(n.line_number || null);
-                    }}
-                    onSelectLine={(line) => {
-                      if (line) setHighlightLine(line);
-                    }}
-                    onSelectFileAndLine={handleSelectFileAndLine}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        </Rnd>
+      )}
 
       {sandboxNodeId && (
         <SandboxModal

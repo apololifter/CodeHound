@@ -67,10 +67,9 @@ body {
    Sidebar
 ═══════════════════════════════════════════════════════ */
 .sidebar {
-  width: 300px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
   background-color: var(--bg-panel);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 20px 16px;
@@ -79,14 +78,47 @@ body {
 }
 
 .right-panel {
-  width: 380px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
   background-color: var(--bg-panel);
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
+
+/* Resize handles for react-resizable-panels */
+.resize-handle-horizontal {
+  width: 5px;
+  background-color: #0c0d16;
+  cursor: col-resize;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.resize-handle-horizontal:hover,
+.resize-handle-horizontal[data-resize-handle-active] {
+  background-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.resize-handle-vertical {
+  height: 5px;
+  background-color: #0c0d16;
+  cursor: row-resize;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.resize-handle-vertical:hover,
+.resize-handle-vertical[data-resize-handle-active] {
+  background-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
 
 .form-group {
   display: flex;
@@ -171,9 +203,6 @@ body {
 }
 
 .right-panel {
-  width: 600px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -181,15 +210,14 @@ body {
 }
 
 .inspector-top-half {
-  height: 50%;
-  border-bottom: 1px solid var(--border);
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .inspector-bottom-half {
-  height: 50%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
