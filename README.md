@@ -2,7 +2,7 @@
 
 ![CodeHound Banner](https://raw.githubusercontent.com/apololifter/CodeHound/main/docs/banner.png)
 
-# CodeHound 🐾
+# CodeXHound 🐾
 
 **Hybrid static & dynamic code analysis tool with AI-powered explanations and interactive call graphs.**
 
@@ -16,17 +16,60 @@
 
 ---
 
-## ¿Qué es CodeHound?
+## ¿Qué es CodeXHound?
 
-CodeHound es una herramienta de análisis de código que combina análisis estático, dinámico e inteligencia artificial para ayudarte a entender, auditar y encontrar vulnerabilidades en proyectos **Python**, **JavaScript** y **PHP**.
+CodeXHound es una herramienta de análisis de código que combina análisis estático, dinámico e inteligencia artificial para ayudarte a entender, auditar y encontrar vulnerabilidades en proyectos **Python**, **JavaScript** y **PHP**.
 
 Apunta a un directorio, escanea el proyecto y obtienes:
 
-- Un **grafo interactivo** de archivos, funciones y dependencias
-- **Flujo de datos** línea a línea dentro de cada función
-- **Simulación de taint** para rastrear datos no confiables hasta sus sinks
-- **Ejecución dinámica en sandbox** con fuzzing automático (Python)
-- **Explicaciones en lenguaje natural** de cualquier función via IA
+- Un **grafo interactivo** de archivos, funciones y dependencias.
+- **Flujo de datos** línea a línea dentro de cada función.
+- **Simulación de taint** para rastrear datos no confiables hasta sus sinks.
+- **Ejecución dinámica en sandbox** con fuzzing automático (Python).
+- **Explicaciones en lenguaje natural** de cualquier función via IA.
+
+---
+
+## 🚀 Inicio Rápido (Instalación y Uso)
+
+Para que el proyecto funcione de inmediato sin complicaciones, sigue estos pasos:
+
+### 1. Clonar el repositorio
+```bash
+git clone https://github.com/apololifter/CodeXHound.git
+cd CodeXHound
+```
+
+### 2. Ejecutar el instalador automático (Recomendado)
+Este script creará el entorno virtual de Python, instalará las dependencias necesarias de backend, configurará el frontend utilizando `pnpm` (por motivos de seguridad) y te guiará para ingresar tus API Keys.
+
+```bash
+# Ejecutar desde el directorio raíz del proyecto
+python instalador.py
+```
+*(Sigue las instrucciones en pantalla para configurar tu sistema operativo y tu Groq API Key).*
+
+### 3. Iniciar los servidores
+
+Para usar CodeXHound, debes iniciar tanto el servidor Backend como el cliente Frontend:
+
+#### A. Iniciar el Backend (Python - API REST)
+```bash
+# Windows
+.\venv\Scripts\python.exe main.py
+
+# Linux / macOS
+./venv/bin/python main.py
+```
+
+#### B. Iniciar el Frontend (React - Interfaz Visual)
+En una nueva ventana de terminal o consola, accede a la carpeta del frontend y arranca el entorno de desarrollo:
+```bash
+cd frontend
+pnpm run dev
+```
+
+Una vez levantados ambos servicios, abre **http://localhost:5173** en tu navegador para comenzar.
 
 ---
 
@@ -88,28 +131,30 @@ Visualización construida con **React Flow (XYFlow)** + **dagre** para layout au
 
 ---
 
-## Instalación
+## Instalación Detallada
 
-### Opción A — Setup automático (recomendado)
+### Opción A — Setup automático (Recomendado)
 
-Descarga [`setup.py`](setup.py), colócalo en la raíz del proyecto y ejecútalo:
+Ejecuta el script interactivo desde la raíz:
 
 ```bash
-# Windows (como Administrador)
-python setup.py
+# Windows
+python instalador.py
 
 # Linux / macOS
-sudo python3 setup.py
+python3 instalador.py
 ```
 
-El script detecta tu sistema operativo, instala todas las dependencias y deja el proyecto listo para correr.
+El script detecta tu sistema operativo, limpia y recrea el entorno virtual si es necesario, instala las dependencias de Python y configura el frontend a través de `pnpm install`.
 
 ### Opción B — Manual
 
+Si prefieres realizar el proceso manualmente sin usar el script `instalador.py`:
+
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/apololifter/CodeHound.git
-cd CodeHound
+git clone https://github.com/apololifter/CodeXHound.git
+cd CodeXHound
 
 # 2. Crear entorno virtual Python
 python -m venv venv
@@ -121,9 +166,7 @@ python -m venv venv
 source venv/bin/activate
 
 # 3. Instalar dependencias Python
-pip install fastapi "uvicorn[standard]" pydantic \
-    tree-sitter tree-sitter-python tree-sitter-javascript tree-sitter-php \
-    openai google-generativeai groq python-dotenv
+pip install -r requirements.txt
 
 # 4. Instalar dependencias del frontend
 cd frontend
@@ -137,9 +180,9 @@ pnpm install
 Crea un archivo `.env` en la raíz del proyecto con las claves de IA que vayas a usar:
 
 ```env
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=AIza...
 GROQ_API_KEY=gsk_...
+GEMINI_API_KEY=AIza...
+OPENAI_API_KEY=sk-...
 ```
 
 > [!NOTE]
@@ -154,12 +197,7 @@ GROQ_API_KEY=gsk_...
 
 ### Iniciar la herramienta
 
-```bash
-cd frontend
-pnpm run dev
-```
-
-Esto levanta el backend y el frontend en paralelo:
+Ejecuta los servidores backend y frontend en paralelo (como se detalla en el **Inicio Rápido**).
 
 | Servicio | URL |
 |----------|-----|
@@ -169,20 +207,20 @@ Esto levanta el backend y el frontend en paralelo:
 
 ### Escanear un proyecto
 
-1. Abre http://localhost:5173 en el navegador
-2. Ingresa la ruta absoluta del directorio a analizar
-3. Haz clic en **Escanear proyecto**
-4. Explora el grafo generado: nodos de archivo (🗂️) y funciones (⚙️)
+1. Abre http://localhost:5173 en el navegador.
+2. Ingresa la ruta absoluta del directorio a analizar.
+3. Haz clic en **Escanear proyecto**.
+4. Explora el grafo generado: nodos de archivo (🗂️) y funciones (⚙️).
 
 ### Analizar una función
 
-1. Haz clic sobre cualquier nodo de función en el grafo
-2. En el panel derecho aparece el código fuente con Monaco Editor
+1. Haz clic sobre cualquier nodo de función en el grafo.
+2. En el panel derecho aparecerá el código fuente con Monaco Editor.
 3. Usa los botones del panel para:
-   - **Flujo de datos** — ver el análisis línea a línea
-   - **Simular taint** — rastrear un payload desde esa función
-   - **Sandbox** — ejecutar dinámicamente con un input específico
-   - **Explicar con IA** — obtener una descripción en lenguaje natural
+   - **Flujo de datos** — ver el análisis línea a línea.
+   - **Simular taint** — rastrear un payload desde esa función.
+   - **Sandbox** — ejecutar dinámicamente con un input específico.
+   - **Explicar con IA** — obtener una descripción en lenguaje natural.
 
 ---
 
@@ -214,9 +252,10 @@ curl -X POST http://127.0.0.1:8000/api/scan \
 ## Estructura del proyecto
 
 ```
-CodeHound/
+CodeXHound/
 ├── main.py                  # Servidor FastAPI
-├── setup.py                 # Setup universal (Windows + Linux)
+├── instalador.py            # Instalador y configurador universal interactivo
+├── requirements.txt         # Requerimientos del Backend
 ├── .env                     # Claves de API (no commitear)
 ├── analyzer/
 │   ├── scanner.py           # Descubrimiento de archivos
@@ -247,11 +286,11 @@ CodeHound/
 
 ## Seguridad
 
-CodeHound tiene protecciones para evitar que sea usado de forma maliciosa:
+CodeXHound tiene protecciones para evitar que sea usado de forma maliciosa:
 
 - **Directorios del sistema bloqueados** — no se puede escanear `C:\Windows`, `/etc`, `/bin`, `/usr`, etc.
-- **Sandbox aislado** — la ejecución dinámica ocurre en un subproceso controlado
-- **Sin ejecución remota** — el backend solo acepta conexiones locales (`127.0.0.1`)
+- **Sandbox aislado** — la ejecución dinámica ocurre en un subproceso controlado y protegido con monkeypatching restrictivo para escrituras y borrados del OS.
+- **Sin ejecución remota** — el backend solo acepta conexiones locales (`127.0.0.1`).
 
 > [!CAUTION]
 > Esta herramienta está diseñada para analizar código propio o de terceros con autorización explícita. No la uses para auditar sistemas sin permiso.
@@ -262,10 +301,10 @@ CodeHound tiene protecciones para evitar que sea usado de forma maliciosa:
 
 Las contribuciones son bienvenidas. Por favor:
 
-1. Haz un fork del repositorio
-2. Crea una rama para tu feature: `git checkout -b feature/nueva-funcionalidad`
-3. Haz commit de tus cambios: `git commit -m 'feat: agregar soporte para Ruby'`
-4. Abre un Pull Request
+1. Haz un fork del repositorio.
+2. Crea una rama para tu feature: `git checkout -b feature/nueva-funcionalidad`.
+3. Haz commit de tus cambios: `git commit -m 'feat: agregar soporte para Ruby'`.
+4. Abre un Pull Request.
 
 ---
 
