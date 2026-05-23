@@ -191,6 +191,22 @@ def setup_frontend():
     except Exception as e:
         print_error(f"Error durante la ejecución de pnpm install: {e}")
 
+def check_tkinter(is_windows):
+    print_header("Comprobando Interfaz Gráfica (Tkinter)")
+    print_info("Comprobando si tu instalación de Python tiene soporte de GUI para el explorador de carpetas...")
+    try:
+        import tkinter
+        print_success("Soporte de tkinter detectado correctamente.")
+    except ImportError:
+        print_warning("No se detectó el módulo 'tkinter' en tu entorno Python global.")
+        if is_windows:
+            print("  Nota: En Windows, tkinter normalmente viene incluido con el instalador oficial de Python.")
+            print("  Si reinstalas Python, asegúrate de dejar marcada la opción 'tcl/tk and IDLE'.")
+        else:
+            print("  Nota: En sistemas basados en Linux (como Ubuntu o Debian), puedes instalarlo ejecutando:")
+            print("  $ sudo apt-get install python3-tk")
+        print("  (Aún podrás usar la aplicación escribiendo las rutas a mano si no lo instalas ahora).\n")
+
 def main():
     print_header("Instalador de CodeXHound")
     print_info("Este script preparará el entorno de backend (Python) y frontend (React) para CodeXHound.")
@@ -214,13 +230,16 @@ def main():
         
     print_info(f"Instalando configuraciones para: {'Windows' if is_windows else 'Linux/macOS'}")
     
-    # 2. Config .env and API Keys
+    # 2. Check GUI support
+    check_tkinter(is_windows)
+    
+    # 3. Config .env and API Keys
     configure_env()
     
-    # 3. Setup Python Virtual Environment
+    # 4. Setup Python Virtual Environment
     setup_python_venv(is_windows)
     
-    # 4. Setup Frontend
+    # 5. Setup Frontend
     setup_frontend()
     
     # 5. Finished
