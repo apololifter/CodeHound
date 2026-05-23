@@ -1,0 +1,50 @@
+{
+  "nodes": [
+    {
+      "id": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\app.py",
+      "type": "file",
+      "language": "python",
+      "label": "app.py"
+    },
+    {
+      "id": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\app.py::main",
+      "type": "function",
+      "language": "python",
+      "label": "main",
+      "parent": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\app.py"
+    },
+    {
+      "id": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\helper.js",
+      "type": "file",
+      "language": "javascript",
+      "label": "helper.js"
+    },
+    {
+      "id": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\script.php",
+      "type": "file",
+      "language": "php",
+      "label": "script.php"
+    },
+    {
+      "id": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\script.php::process_data",
+      "type": "function",
+      "language": "php",
+      "label": "process_data",
+      "parent": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\script.php"
+    }
+  ],
+  "edges": [
+    {
+      "source": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\app.py",
+      "target": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\script.php",
+      "type": "hybrid_call",
+      "label": "subprocess.run"
+    },
+    {
+      "source": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\script.php",
+      "target": "C:\\Users\\eduar\\OneDrive\\Escritorio\\challenges\\web_offlinea\\workspace\\static_analyzer\\test_project\\helper.js",
+      "type": "hybrid_call",
+      "label": "exec"
+    }
+  ]
+}
