@@ -1,6 +1,6 @@
 <div align="center">
 
-![CodeHound Banner](https://github.com/apololifter/CodeXHound/blob/main/codexhound.png)
+![CodeHound Banner]([https://github.com/apololifter/CodeXHound/blob/main/codexhound.png](https://github.com/apololifter/CodeXHound/blob/main/codeXhound.png?raw=true))
 
 # CodeXHound 🐾
 
