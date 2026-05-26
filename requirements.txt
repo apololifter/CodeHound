@@ -7,8 +7,10 @@ pydantic>=2.0.0
 python-dotenv>=1.0.0
 
 # Inteligencia Artificial
-openai>=1.12.0
-google-genai>=0.1.0
+openai>=1.12.0          # Usado con Groq (compatible con OpenAI SDK) y OpenAI
+google-genai>=0.1.0     # Google Gemini
+groq>=0.9.0             # Cliente oficial Groq (fallback nativo)
+requests>=2.31.0        # Peticiones HTTP genéricas
 
 # Analizador Estático (AST)
 tree-sitter>=0.21.0

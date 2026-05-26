@@ -18,8 +18,7 @@ export function useGraphDerivation(
   inactiveNodes = [],
   tracePath = [],
   currentStepIndex = -1,
-  selectedFilepath = null,
-  layoutMode = 'hierarchical'
+  selectedFilepath = null
 ) {
   return useMemo(() => {
     if (!globalNodes || globalNodes.length === 0) return { visibleNodes: [], visibleEdges: [] };
@@ -56,21 +55,6 @@ export function useGraphDerivation(
             const tgt = nodeById.get(edge.target);
             if (src?.parent) visibleNodeIds.add(src.parent);
             if (tgt?.parent) visibleNodeIds.add(tgt.parent);
-          }
-        }
-      }
-    }
-    // ─── Mode 1.5: Attack Path (Simulation finished, isolate path) ───────────
-    else if (layoutMode === 'attack_path' && tracePath.length > 0) {
-      for (const item of tracePath) {
-        if (item.type === 'node') {
-          visibleNodeIds.add(item.id);
-        } else if (item.type === 'edge') {
-          const edge = globalEdges.find(e => e.id === item.id);
-          if (edge) {
-            visibleEdgeIds.add(item.id);
-            visibleNodeIds.add(edge.source);
-            visibleNodeIds.add(edge.target);
           }
         }
       }
@@ -286,5 +270,5 @@ export function useGraphDerivation(
       visibleEdges: Array.from(edgeMap.values()),
     };
   }, [globalNodes, globalEdges, focusedNodeId, collapsedFiles,
-      simulatedEdges, inactiveNodes, tracePath, currentStepIndex, layoutMode, selectedFilepath]);
+      simulatedEdges, inactiveNodes, tracePath, currentStepIndex, selectedFilepath]);
 }

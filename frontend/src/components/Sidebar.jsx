@@ -85,7 +85,9 @@ export function Sidebar({
   discoveredSources = [],
   focusedNodeId, 
   setFocusedNodeId, 
-  onSimulate 
+  onSimulate,
+  discoveredSinks = [],
+  onOpenSinks
 }) {
   const [sourceId, setSourceId] = useState('');
   const [payload, setPayload] = useState("' OR 1=1 --");
@@ -429,6 +431,37 @@ export function Sidebar({
           </>
         )}
       </Section>
+
+      {/* STEP 4: SINKS (Only visible if sinks exist) */}
+      {discoveredSinks && discoveredSinks.length > 0 && (
+        <Section
+          step={4} done={false} icon="🚨" title="Analizar Sinks"
+          open={openSection === 'sinks'} onToggle={() => toggle('sinks')}
+          hint="Se encontraron funciones con posibles vulnerabilidades. Revisa qué sinks están activos en tu código."
+        >
+          <div style={{ background: 'rgba(249,115,22,0.1)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(249,115,22,0.25)', marginBottom: '14px' }}>
+            <p style={{ fontSize: '12px', color: '#fb923c', fontWeight: '600', marginBottom: '8px' }}>
+              ⚠️ {discoveredSinks.length} archivo(s) con Sinks
+            </p>
+            <p style={{ fontSize: '11px', color: '#fdba74', marginBottom: '12px', lineHeight: '1.4' }}>
+              El análisis estático ha identificado llamadas a funciones de riesgo (ej. eval, exec, sqlite3.connect). 
+              Es vital auditar estos puntos para prevenir inyecciones.
+            </p>
+            <button
+              className="btn"
+              onClick={onOpenSinks}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                background: 'linear-gradient(135deg, #f97316, #ea580c)',
+                boxShadow: '0 4px 12px rgba(234,88,12,0.3)',
+              }}
+            >
+              <Target size={14} />
+              Abrir Panel de Sinks
+            </button>
+          </div>
+        </Section>
+      )}
 
       {/* Help */}
       <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #1f2937' }}>

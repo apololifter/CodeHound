@@ -5,7 +5,9 @@ from typing import List, Dict
 SANITIZERS = {"escape", "sanitize", "clean", "validate", "filter", "strip", "purify",
                "int", "float", "filter_var", "htmlspecialchars", "intval", "str_replace"}
 
-DANGEROUS_SINKS = {"query", "execute", "eval", "system", "exec", "render", "send", "write"}
+from analyzer.sinks_db import get_sinks
+
+DANGEROUS_SINKS = get_sinks()
 
 def simulate_taint_flow(source_id: str, payload: str,
                         all_nodes: List[Dict], all_edges: List[Dict], function_registry: Dict) -> Dict:

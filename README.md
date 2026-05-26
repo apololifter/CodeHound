@@ -26,7 +26,9 @@ Apunta a un directorio, escanea el proyecto y obtienes:
 - **Flujo de datos** línea a línea dentro de cada función.
 - **Simulación de taint** para rastrear datos no confiables hasta sus sinks.
 - **Ejecución dinámica en sandbox** con fuzzing automático (Python).
-- **Explicaciones en lenguaje natural** de cualquier función via IA.
+- **Explicaciones en lenguaje natural** de cualquier función o sink via IA.
+- **Panel de Sinks Peligrosos** con scroll, detalle por función y riesgo explicado por IA.
+- **DebuggerPanel** con visualización de taint paso a paso.
 
 ---
 
@@ -101,6 +103,12 @@ Selecciona cualquier función del grafo y obtén una explicación en lenguaje na
 
 ### 🗺️ Grafo interactivo
 Visualización construida con **React Flow (XYFlow)** + **dagre** para layout automático. Navega el proyecto completo como un grafo, filtra por archivo, haz zoom en funciones específicas y explora las conexiones entre módulos.
+
+### ☣️ Panel de Sinks Peligrosos
+Muestra todos los sinks detectados en el proyecto (llamadas a funciones vulnerables como `eval`, `exec`, `os.system`, `mysqli_query`, etc.) en un panel redimensionable con **scroll** que permite ver todos los resultados aunque sean muchos. Cada sink puede ser explicado por la IA para entender su nivel de riesgo y cómo explotarlo o mitigarlo.
+
+### 🔍 DebuggerPanel
+Panel integrado en la barra lateral que permite seguir el flujo de taint paso a paso, inspeccionando cada nodo del camino desde la fuente hasta el sink.
 
 ---
 
@@ -237,6 +245,8 @@ POST /api/simulate/taint        Simular propagación de taint
 POST /api/simulate/sandbox      Ejecución dinámica con payload
 POST /api/simulate/fuzzing      Fuzzing automático de una función
 POST /api/ai/explain            Explicación con IA de una función
+POST /api/ai/explain_sink       Explicación con IA de un sink específico
+POST /api/browse_folder         Selector nativo de carpetas (backend)
 ```
 
 Ejemplo:
@@ -263,10 +273,20 @@ CodeXHound/
 │   ├── hybrid_detector.py   # Selección de estrategia por lenguaje
 │   ├── dataflow_analyzer.py # Análisis de flujo de datos
 │   ├── taint_engine.py      # Motor de propagación de taint
-│   ├── ai_agent.py          # Integración con LLMs
-│   └── sandbox_runner.py    # Ejecución dinámica y fuzzer
+│   ├── ai_agent.py          # Integración con LLMs (Groq / Gemini / OpenAI)
+│   ├── sandbox_runner.py    # Ejecución dinámica y fuzzer
+│   ├── sinks_db.py          # Base de datos de sinks peligrosos por lenguaje
+│   └── sinks.json           # Definiciones JSON de funciones vulnerables
 ├── frontend/
-│   ├── src/                 # Código React
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Sidebar.jsx        # Panel lateral principal
+│   │   │   ├── SinksModal.jsx     # Panel de sinks peligrosos con scroll
+│   │   │   ├── DebuggerPanel.jsx  # Panel de taint visual paso a paso
+│   │   │   ├── SandboxModal.jsx   # Modal de ejecución dinámica
+│   │   │   ├── GraphCanvas.jsx    # Lienzo del grafo interactivo
+│   │   │   └── CustomNode.jsx     # Nodos personalizados del grafo
+│   │   └── App.jsx            # Componente raíz
 │   ├── package.json
 │   └── vite.config.js
 └── test_project/            # Proyecto de ejemplo para probar

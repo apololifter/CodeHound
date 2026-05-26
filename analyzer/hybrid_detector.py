@@ -171,6 +171,36 @@ class PythonStrategy(LanguageStrategy):
                                 "line_number": node.start_point[0] + 1,
                                 "line_code": self._get_line_code(source_code, node.start_point[0] + 1)
                             })
+            elif node.type == "import_statement":
+                for child in node.children:
+                    if child.type == "dotted_name":
+                        mod_name = source_code[child.start_byte:child.end_byte].decode('utf-8')
+                        target_basename = mod_name.split('.')[-1] + ".py"
+                        if target_basename in filename_map:
+                            for tgt_path in filename_map[target_basename]:
+                                edges.append({
+                                    "source": f"Global::{tgt_path}",
+                                    "target": f"Global::{filepath}",
+                                    "type": "DATA_DEPENDENCY",
+                                    "label": f"import {target_basename}",
+                                    "line_number": node.start_point[0] + 1,
+                                    "line_code": self._get_line_code(source_code, node.start_point[0] + 1)
+                                })
+                    elif child.type == "aliased_import":
+                        name_node = child.child_by_field_name("name")
+                        if name_node:
+                            mod_name = source_code[name_node.start_byte:name_node.end_byte].decode('utf-8')
+                            target_basename = mod_name.split('.')[-1] + ".py"
+                            if target_basename in filename_map:
+                                for tgt_path in filename_map[target_basename]:
+                                    edges.append({
+                                        "source": f"Global::{tgt_path}",
+                                        "target": f"Global::{filepath}",
+                                        "type": "DATA_DEPENDENCY",
+                                        "label": f"import {target_basename}",
+                                        "line_number": node.start_point[0] + 1,
+                                        "line_code": self._get_line_code(source_code, node.start_point[0] + 1)
+                                    })
                             
             if node.type == "function_definition":
                 name_node = node.child_by_field_name("name")

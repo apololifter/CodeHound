@@ -9,235 +9,96 @@ import {
   MiniMap,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import '@xyflow/react/dist/style.css';
 import { CustomNode } from './CustomNode';
 import dagre from 'dagre';
-import * as d3 from 'd3-force';
 
 const nodeTypes = { custom: CustomNode };
 
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 72;
 
-function getLayoutedElements(nodes, edges, mode) {
+function getLayoutedElements(nodes, edges) {
   if (nodes.length === 0) return { nodes, edges };
 
-  if (mode === 'radial') {
-    const files = nodes.filter(n => n.data?.type === 'file');
-    const funcs = nodes.filter(n => n.data?.type === 'function');
-    
-    const parents = files.length > 0 ? files : nodes;
-    const R_main = Math.max(400, parents.length * 100);
-    const center = { x: R_main + 200, y: R_main + 200 };
-
-    parents.forEach((p, i) => {
-      const angle = (i / parents.length) * 2 * Math.PI;
-      p.targetPosition = 'left';
-      p.sourcePosition = 'right';
-      p.position = {
-        x: center.x + R_main * Math.cos(angle) - NODE_WIDTH / 2,
-        y: center.y + R_main * Math.sin(angle) - NODE_HEIGHT / 2
-      };
-
-      const children = funcs.filter(c => c.data?.parent === p.id);
-      if (children.length > 0) {
-        const R_child = Math.max(160, children.length * 40);
-        children.forEach((c, j) => {
-          const childAngle = (j / children.length) * 2 * Math.PI;
-          c.targetPosition = 'left';
-          c.sourcePosition = 'right';
-          c.position = {
-            x: (p.position.x + NODE_WIDTH/2) + R_child * Math.cos(childAngle) - NODE_WIDTH / 2,
-            y: (p.position.y + NODE_HEIGHT/2) + R_child * Math.sin(childAngle) - NODE_HEIGHT / 2
-          };
-        });
-      }
-    });
-
-    // Unparented functions
-    funcs.filter(c => !parents.find(p => p.id === c.data?.parent)).forEach((c, i) => {
-       c.position = { x: center.x, y: center.y + i * 100 };
-    });
-
-    return { nodes: [...parents, ...funcs], edges };
-
-  } else if (mode === 'attack_path') {
-    const g = new dagre.graphlib.Graph({ compound: true });
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120, marginx: 40, marginy: 40 });
-
-    nodes.forEach(n => {
-      if (n.data?.type === 'file') {
-        const hasVisibleChildren = nodes.some(c => c.data?.parent === n.id && c.id !== n.id);
-        if (hasVisibleChildren) {
-          g.setNode(n.id, { minWidth: 240, minHeight: 140, paddingTop: 60, paddingBottom: 20, paddingLeft: 20, paddingRight: 20 });
-        } else {
-          g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-        }
-      } else {
-        g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-      }
-    });
-
-    nodes.forEach(n => {
-      if (n.data?.type === 'function' && n.data?.parent) {
-        if (nodes.some(p => p.id === n.data.parent)) {
-          g.setParent(n.id, n.data.parent);
-        }
-      }
-    });
-
-    edges.forEach(e => {
-      if (g.hasNode(e.source) && g.hasNode(e.target)) {
-        g.setEdge(e.source, e.target);
-      }
-    });
-
-    dagre.layout(g);
-
-    const layoutedNodes = nodes.map(n => {
-      const pos = g.node(n.id);
-      if (!pos) return n;
-
-      const hasParent = n.data?.type === 'function' && n.data?.parent && nodes.some(p => p.id === n.data.parent);
-      if (hasParent) {
-        const parentPos = g.node(n.data.parent);
-        const parentLeft = parentPos.x - parentPos.width / 2;
-        const parentTop = parentPos.y - parentPos.height / 2;
-        const childLeft = pos.x - pos.width / 2;
-        const childTop = pos.y - pos.height / 2;
-        return {
-          ...n,
-          parentId: n.data.parent,
-          extent: 'parent',
-          targetPosition: 'left',
-          sourcePosition: 'right',
-          position: {
-            x: childLeft - parentLeft,
-            y: childTop - parentTop
-          }
-        };
-      } else {
-        return {
-          ...n,
-          parentId: undefined,
-          extent: undefined,
-          targetPosition: 'left',
-          sourcePosition: 'right',
-          position: {
-            x: pos.x - pos.width / 2,
-            y: pos.y - pos.height / 2
-          },
-          style: {
-            ...n.style,
-            width: pos.width,
-            height: pos.height
-          }
-        };
-      }
-    });
-
-    return { nodes: layoutedNodes, edges };
-  } else if (mode === 'force') {
-    const simulationNodes = nodes.map(n => ({ ...n, x: Math.random() * 800, y: Math.random() * 800 }));
-    const simulationEdges = edges.map(e => ({ ...e, source: e.source, target: e.target }));
-
-    const simulation = d3.forceSimulation(simulationNodes)
-      .force('link', d3.forceLink(simulationEdges).id(d => d.id).distance(250).strength(0.5))
-      .force('charge', d3.forceManyBody().strength(-2000).distanceMax(1000))
-      .force('center', d3.forceCenter(0, 0))
-      .force('collide', d3.forceCollide().radius(NODE_WIDTH * 0.6).iterations(3))
-      .stop();
-
-    for (let i = 0; i < 300; ++i) simulation.tick();
-
-    return {
-      nodes: simulationNodes.map(n => {
-        const originalNode = nodes.find(orig => orig.id === n.id) || n;
-        return {
-          ...originalNode,
-          targetPosition: 'top',
-          sourcePosition: 'bottom',
-          position: { x: n.x - NODE_WIDTH / 2, y: n.y - NODE_HEIGHT / 2 }
-        };
-      }),
-      edges
-    };
-  }
-
-  // Default Hierarchical (dagre)
   const g = new dagre.graphlib.Graph({ compound: true });
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: 'TB', nodesep: 120, ranksep: 200, marginx: 60, marginy: 60 });
 
-  nodes.forEach(n => {
-    if (n.data?.type === 'file') {
-      const hasVisibleChildren = nodes.some(c => c.data?.parent === n.id && c.id !== n.id);
-      if (hasVisibleChildren) {
-        g.setNode(n.id, { minWidth: 240, minHeight: 140, paddingTop: 60, paddingBottom: 20, paddingLeft: 20, paddingRight: 20 });
-      } else {
-        g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-      }
-    } else {
-      g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  const fileNodes = nodes.filter(n => n.data?.type === 'file');
+  const functionNodes = nodes.filter(n => n.data?.type === 'function');
+
+  // 1. Manually layout children inside their parents
+  const fileChildren = {};
+  functionNodes.forEach(n => {
+    if (n.data?.parent && fileNodes.some(f => f.id === n.data.parent)) {
+      if (!fileChildren[n.data.parent]) fileChildren[n.data.parent] = [];
+      fileChildren[n.data.parent].push(n);
     }
   });
 
-  nodes.forEach(n => {
-    if (n.data?.type === 'function' && n.data?.parent) {
-      if (nodes.some(p => p.id === n.data.parent)) {
-        g.setParent(n.id, n.data.parent);
-      }
-    }
+  // Calculate file sizes based on manual stacking with dynamic heights
+  fileNodes.forEach(n => {
+    const children = fileChildren[n.id] || [];
+    let totalHeight = 50; // Header height
+    children.forEach(c => {
+      const childHeight = c.data?.aiExplanation ? 160 : 45; // Base height + AI box if exists
+      totalHeight += childHeight;
+    });
+    totalHeight += 10; // Bottom padding
+    const height = children.length > 0 ? totalHeight : NODE_HEIGHT;
+    g.setNode(n.id, { width: 320, height }); // Fixed width 320px for files, dynamic height
   });
 
+  // ONLY add edges between files or root nodes to Dagre
   edges.forEach(e => {
-    if (g.hasNode(e.source) && g.hasNode(e.target)) {
-      g.setEdge(e.source, e.target);
+    const sourceNode = nodes.find(n => n.id === e.source);
+    const targetNode = nodes.find(n => n.id === e.target);
+    const sourceParent = sourceNode?.data?.parent && g.hasNode(sourceNode.data.parent) ? sourceNode.data.parent : e.source;
+    const targetParent = targetNode?.data?.parent && g.hasNode(targetNode.data.parent) ? targetNode.data.parent : e.target;
+    
+    if (g.hasNode(sourceParent) && g.hasNode(targetParent)) {
+      g.setEdge(sourceParent, targetParent);
     }
   });
 
   dagre.layout(g);
 
   const layoutedNodes = nodes.map(n => {
-    const pos = g.node(n.id);
-    if (!pos) return n;
+    if (n.data?.type === 'file') {
+      const pos = g.node(n.id);
+      return {
+        ...n,
+        targetPosition: 'top',
+        sourcePosition: 'bottom',
+        position: { x: pos.x - pos.width / 2, y: pos.y - pos.height / 2 },
+        style: { ...n.style, width: pos.width, height: pos.height, padding: 0 }
+      };
+    } else if (n.data?.type === 'function' && n.data?.parent && fileNodes.some(f => f.id === n.data.parent)) {
+      const siblings = fileChildren[n.data.parent] || [];
+      const index = siblings.findIndex(s => s.id === n.id);
+      
+      // Calculate dynamic Y position based on previous siblings' heights
+      let yPos = 50;
+      for (let i = 0; i < index; i++) {
+        yPos += siblings[i].data?.aiExplanation ? 160 : 45;
+      }
 
-    const hasParent = n.data?.type === 'function' && n.data?.parent && nodes.some(p => p.id === n.data.parent);
-    if (hasParent) {
-      const parentPos = g.node(n.data.parent);
-      const parentLeft = parentPos.x - parentPos.width / 2;
-      const parentTop = parentPos.y - parentPos.height / 2;
-      const childLeft = pos.x - pos.width / 2;
-      const childTop = pos.y - pos.height / 2;
       return {
         ...n,
         parentId: n.data.parent,
         extent: 'parent',
-        targetPosition: 'top',
-        sourcePosition: 'bottom',
-        position: {
-          x: childLeft - parentLeft,
-          y: childTop - parentTop
-        }
+        targetPosition: 'left',
+        sourcePosition: 'right',
+        position: { x: 20, y: yPos },
+        style: { ...n.style, width: 280 } // fit inside 320px width
       };
     } else {
-      return {
+      // Free-floating nodes (if any)
+      const pos = g.node(n.id);
+      return pos ? {
         ...n,
-        parentId: undefined,
-        extent: undefined,
-        targetPosition: 'top',
-        sourcePosition: 'bottom',
-        position: {
-          x: pos.x - pos.width / 2,
-          y: pos.y - pos.height / 2
-        },
-        style: {
-          ...n.style,
-          width: pos.width,
-          height: pos.height
-        }
-      };
+        position: { x: pos.x - pos.width / 2, y: pos.y - pos.height / 2 }
+      } : n;
     }
   });
 
@@ -247,7 +108,6 @@ function getLayoutedElements(nodes, edges, mode) {
 export function GraphCanvas({ 
   nodes: rawNodes, 
   edges: rawEdges, 
-  layoutMode = 'hierarchical', 
   onAiExplain, 
   onDataFlowInspect,
   onNodeSelect,
@@ -261,12 +121,16 @@ export function GraphCanvas({
   collapsedFiles,
   highlightedNodeId,
   simulatedDataFlow,
-  onSandboxTest
+  onSandboxTest,
+  discoveredSources = [],
+  discoveredSinks = []
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [menu, setMenu] = useState(null);
   const [edgeTooltip, setEdgeTooltip] = useState(null);
+  const [nodeTooltip, setNodeTooltip] = useState(null);
+  const [tracedFlow, setTracedFlow] = useState(null);
   const menuRef = useRef(null);
 
   // Build React Flow nodes/edges from prop data
@@ -281,6 +145,9 @@ export function GraphCanvas({
       const hasOutgoingEdges = globalEdges?.some(e => e.source === n.id) ?? false;
       const isExpanded = expandedNodes?.has(n.id) ?? false;
       const isCollapsedFile = n.type === 'file' ? (collapsedFiles?.has(n.id) ?? false) : false;
+
+      const isSource = discoveredSources.some(s => s.node_id === n.id);
+      const isSink = discoveredSinks.some(s => s.node_id === n.id);
 
       const functionCount = n.type === 'file'
         ? globalNodes.filter(child => child.type === 'function' && child.parent === n.id).length
@@ -300,12 +167,19 @@ export function GraphCanvas({
           );
         }
       }
-      const nodeOpacity = highlightedNodeId ? (isConnectedToHighlighted ? 1 : 0.2) : 1;
+      
+      let isTraced = false;
+      if (tracedFlow) {
+        isTraced = tracedFlow.nodes.has(n.id) || (n.parent && tracedFlow.nodes.has(n.parent));
+      }
+      
+      const nodeOpacity = tracedFlow ? (isTraced ? 1 : 0.1) : (highlightedNodeId ? (isConnectedToHighlighted ? 1 : 0.2) : 1);
 
       return {
         id: n.id,
         type: 'custom',
         data: {
+          id: n.id,
           label: n.label,
           type: n.type,
           language: n.language,
@@ -316,6 +190,10 @@ export function GraphCanvas({
           isCollapsedFile,
           functionCount,
           parentFile,
+          isSource,
+          isSink,
+          aiExplanation: n.data?.aiExplanation,
+          onAiExplain: () => onAiExplain?.(n.id),
           onExpand: () => onExpandNode?.(n.id),
           onCollapse: () => onCollapseNode?.(n.id),
           onToggleFile: () => onToggleFile?.(n.id),
@@ -333,9 +211,13 @@ export function GraphCanvas({
         }
       }
       
-      const edgeStyle = highlightedNodeId 
-        ? (isDirectConnection ? { stroke: '#ef4444', strokeWidth: 3, opacity: 1 } : { ...e.style, opacity: 0.15 })
-        : e.style || {};
+      const isTracedEdge = tracedFlow ? tracedFlow.edges.has(e.id) : false;
+      
+      const edgeStyle = tracedFlow
+        ? (isTracedEdge ? { stroke: '#a855f7', strokeWidth: 4, filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.6))', opacity: 1 } : { ...e.style, opacity: 0.05 })
+        : highlightedNodeId 
+          ? (isDirectConnection ? { stroke: '#ef4444', strokeWidth: 3, opacity: 1 } : { ...e.style, opacity: 0.15 })
+          : e.style || {};
 
       return {
         id: e.id,
@@ -344,16 +226,24 @@ export function GraphCanvas({
         label: e.label,
         data: e.data,
         type: 'smoothstep',
-        animated: isDirectConnection ? true : (e.animated ?? false),
+        animated: (tracedFlow && isTracedEdge) ? true : (isDirectConnection ? true : (e.animated ?? false)),
         style: { ...edgeStyle, transition: 'opacity 0.3s ease, stroke 0.3s ease, stroke-width 0.3s ease' },
       };
     });
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, rfEdges, layoutMode);
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, rfEdges);
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
-  }, [rawNodes, rawEdges, layoutMode, highlightedNodeId, globalNodes, globalEdges, expandedNodes, collapsedFiles,
-      onExpandNode, onCollapseNode, onToggleFile, setNodes, setEdges]);
+  }, [rawNodes, rawEdges, highlightedNodeId, tracedFlow, globalNodes, globalEdges, expandedNodes, collapsedFiles,
+      discoveredSources, discoveredSinks, onExpandNode, onCollapseNode, onToggleFile, setNodes, setEdges]);
+
+  // Reset local states on new graph
+  useEffect(() => {
+    setTracedFlow(null);
+    setNodeTooltip(null);
+    setEdgeTooltip(null);
+    setMenu(null);
+  }, [rawNodes]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -416,6 +306,37 @@ export function GraphCanvas({
     setMenu({ id: node.id, top: event.clientY, left: event.clientX });
   }, []);
 
+  const onNodeMouseEnter = useCallback((event, node) => {
+    if (node.data?.type === 'function') {
+      setNodeTooltip({ id: node.id, x: event.clientX, y: event.clientY, data: node.data });
+    }
+  }, []);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setNodeTooltip(null);
+  }, []);
+
+  const handleTraceFlow = useCallback((startNodeId) => {
+    const reachableNodes = new Set([startNodeId]);
+    const reachableEdges = new Set();
+    const queue = [startNodeId];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const outgoing = globalEdges.filter(e => e.source === current);
+      for (const edge of outgoing) {
+        reachableEdges.add(edge.id);
+        if (!reachableNodes.has(edge.target)) {
+          reachableNodes.add(edge.target);
+          queue.push(edge.target);
+        }
+      }
+    }
+
+    setTracedFlow({ nodes: reachableNodes, edges: reachableEdges });
+    setMenu(null);
+  }, [globalEdges]);
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <ReactFlow
@@ -425,10 +346,13 @@ export function GraphCanvas({
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeContextMenu={onNodeContextMenu}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         onEdgeClick={onEdgeClick}
         onPaneClick={(e) => {
           setMenu(null);
           setEdgeTooltip(null);
+          setTracedFlow(null);
           onPaneClick?.(e);
         }}
         nodeTypes={nodeTypes}
@@ -475,7 +399,10 @@ export function GraphCanvas({
           {menu.id.includes('::') && (
             <>
               <button className="ctx-menu-item" onClick={() => { onDataFlowInspect?.(menu.id); setMenu(null); }}>
-                🔍 Rastrear Flujo de Datos
+                🔍 Inspeccionar Flujo (IDE)
+              </button>
+              <button className="ctx-menu-item" onClick={() => handleTraceFlow(menu.id)}>
+                ✨ Rastrear Lógica Visual (Grafo)
               </button>
               <button className="ctx-menu-item" onClick={() => { onSandboxTest?.(menu.id); setMenu(null); }}>
                 🧪 Inyectar Sandbox (Unit Test)
@@ -529,6 +456,36 @@ export function GraphCanvas({
                {edgeTooltip.code}
              </div>
           )}
+        </div>
+      )}
+
+      {nodeTooltip && (
+        <div style={{
+          position: 'fixed',
+          top: nodeTooltip.y + 15,
+          left: nodeTooltip.x + 15,
+          background: 'rgba(15, 17, 26, 0.95)',
+          border: nodeTooltip.data.isSink ? '1px solid #ef4444' : '1px solid #374151',
+          borderRadius: '8px',
+          padding: '12px',
+          zIndex: 1000,
+          color: 'white',
+          maxWidth: '300px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '8px', color: '#f3f4f6' }}>
+            ƒ {nodeTooltip.data.label}()
+          </div>
+          {nodeTooltip.data.isSink && (
+            <div style={{ color: '#fca5a5', fontSize: '12px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239, 68, 68, 0.1)', padding: '6px', borderRadius: '4px' }}>
+              <span>🚨</span> Contiene Sinks Peligrosos
+            </div>
+          )}
+          <div style={{ fontSize: '11px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>🪄</span> Explicar con IA (Clic derecho)
+          </div>
         </div>
       )}
     </div>

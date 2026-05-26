@@ -5,172 +5,16 @@ import { CodeViewer } from './components/CodeViewer';
 import { useGraphDerivation } from './hooks/useGraphDerivation';
 import { ConnectionExplorer } from './components/ConnectionExplorer';
 import { DataFlowInspector } from './components/DataFlowInspector';
-import { SequenceDiagram } from './components/SequenceDiagram';
+
 import { SandboxModal } from './components/SandboxModal';
-import { SkipBack, SkipForward } from 'lucide-react';
-import { Rnd } from 'react-rnd';
+import DebuggerPanel from './components/DebuggerPanel';
+import SinksModal from './components/SinksModal';
+import { AlertTriangle, Plus, Minus, Maximize2, Minimize2, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-function formatAiExplanation(text, onSelectLine) {
-  if (!text) return null;
 
-  const lines = text.split('\n');
-  const rendered = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Check for "Línea X:" pattern anywhere in the line
-    const lineMatch = line.match(/(?:Línea|Linea)\s+(\d+):(.*)/i);
-    if (lineMatch) {
-      const lineNum = parseInt(lineMatch[1], 10);
-      const rest = lineMatch[2];
-
-      // split the rest by "->"
-      const arrowParts = rest.split('->');
-      let codePart = rest;
-      let explanationPart = '';
-      if (arrowParts.length > 1) {
-        codePart = arrowParts[0];
-        explanationPart = arrowParts.slice(1).join('->');
-      }
-
-      rendered.push(
-        <div 
-          key={i} 
-          onClick={() => onSelectLine?.(lineNum)}
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '10px',
-            padding: '8px 12px',
-            margin: '6px 0',
-            borderRadius: '6px',
-            background: 'rgba(99, 102, 241, 0.04)',
-            borderLeft: '3px solid #6366f1',
-            cursor: 'pointer',
-            transition: 'background 0.15s, border-left-color 0.15s',
-          }}
-          className="ai-explanation-line-item"
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
-            e.currentTarget.style.borderLeftColor = '#818cf8';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.04)';
-            e.currentTarget.style.borderLeftColor = '#6366f1';
-          }}
-        >
-          <span style={{
-            fontSize: '10px',
-            fontWeight: '700',
-            color: '#818cf8',
-            background: 'rgba(99, 102, 241, 0.15)',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            fontFamily: 'monospace',
-            flexShrink: 0,
-            marginTop: '2px'
-          }}>
-            L{lineNum}
-          </span>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {codePart.trim() && (
-              <code style={{
-                fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-                fontSize: '12px',
-                color: '#e2e8f0',
-                background: '#090b11',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                width: 'fit-content',
-                wordBreak: 'break-all'
-              }}>
-                {codePart.trim()}
-              </code>
-            )}
-            {explanationPart && (
-              <span style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px', lineHeight: '1.5' }}>
-                {explanationPart.trim()}
-              </span>
-            )}
-          </div>
-        </div>
-      );
-      continue;
-    }
-
-    // Parse markdown headers
-    if (line.startsWith('###') || line.startsWith('##') || line.startsWith('#')) {
-      const cleanText = line.replace(/^[#\s]+/, '').replace(/\*\*+/g, '');
-      rendered.push(
-        <h4 key={i} style={{ 
-          color: '#818cf8', 
-          fontSize: '14px', 
-          fontWeight: '700', 
-          marginTop: '18px', 
-          marginBottom: '8px',
-          borderBottom: '1px solid #1f2937',
-          paddingBottom: '6px'
-        }}>
-          {cleanText}
-        </h4>
-      );
-      continue;
-    }
-
-    // Check for bold headers or bullet points with bold text
-    const boldHeaderMatch = line.match(/^(\s*[-*]?\s*\d*\.?\s*)\*\*(.*?)\*\*(.*)/);
-    if (boldHeaderMatch) {
-      const prefix = boldHeaderMatch[1];
-      const headerTitle = boldHeaderMatch[2];
-      const rest = boldHeaderMatch[3];
-      
-      const isSection = /^(?:Qué hace|Explicación|Riesgos|Inputs|Recomendación|Parche)/i.test(headerTitle) || prefix.includes('.');
-      if (isSection) {
-        rendered.push(
-          <h4 key={i} style={{ 
-            color: '#10b981', 
-            fontSize: '14px', 
-            fontWeight: '700', 
-            marginTop: '18px', 
-            marginBottom: '8px',
-            borderBottom: '1px solid #1f2937',
-            paddingBottom: '6px'
-          }}>
-            {headerTitle} {rest}
-          </h4>
-        );
-        continue;
-      }
-    }
-
-    // Default inline markdown formatting
-    let temp = line;
-    let parts = [];
-    let keyIdx = 0;
-    
-    const regex = /(\*\*.*?\*\*|`.*?`)/g;
-    const splitParts = temp.split(regex);
-    
-    for (let p of splitParts) {
-      if (p.startsWith('**') && p.endsWith('**')) {
-        parts.push(<strong key={keyIdx++} style={{ color: '#f3f4f6', fontWeight: '600' }}>{p.slice(2, -2)}</strong>);
-      } else if (p.startsWith('`') && p.endsWith('`')) {
-        parts.push(<code key={keyIdx++} style={{ fontFamily: 'monospace', color: '#f43f5e', background: '#1e1b4b', padding: '1px 4px', borderRadius: '3px', fontSize: '11px' }}>{p.slice(1, -1)}</code>);
-      } else {
-        parts.push(p);
-      }
-    }
-
-    rendered.push(
-      <div key={i} style={{ minHeight: '18px', margin: '6px 0', fontSize: '13px', color: '#9ca3af', lineHeight: '1.6' }}>
-        {parts.length > 0 ? parts : line}
-      </div>
-    );
-  }
-
-  return <div style={{ paddingBottom: '20px' }}>{rendered}</div>;
-}
+// formatAiExplanation has been removed in favor of ReactMarkdown
 
 // ─── Welcome Screen shown before any scan ─────────────────────────────────────
 function WelcomeScreen() {
@@ -300,7 +144,7 @@ function App() {
   const [globalData, setGlobalData] = useState({ nodes: [], edges: [], discovered_sources: [] });
   const [directory, setDirectory] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
-  const [layoutMode, setLayoutMode] = useState('hierarchical');
+
 
   const [isScanLoading, setIsScanLoading] = useState(false);
   const [scanError, setScanError] = useState('');
@@ -309,6 +153,11 @@ function App() {
   const [sandboxNodeId, setSandboxNodeId] = useState(null);
   const [sandboxData, setSandboxData] = useState(null);
 
+  const [debuggerDastResult, setDebuggerDastResult] = useState(null);
+  const [debuggerFuzzResults, setDebuggerFuzzResults] = useState(null);
+  const [debuggerTargetParam, setDebuggerTargetParam] = useState('');
+  const [isDebuggerLoading, setIsDebuggerLoading] = useState(false);
+
   const [selectedFilepath, setSelectedFilepath] = useState(null);
   const [focusedNodeId, setFocusedNodeId] = useState(null);
   const [highlightedNodeId, setHighlightedNodeId] = useState(null);
@@ -316,11 +165,10 @@ function App() {
   const [collapsedFiles, setCollapsedFiles] = useState(new Set());
 
   const [activeTab, setActiveTab] = useState('connections');
-  const [aiExplanation, setAiExplanation] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
+
   const [highlightLine, setHighlightLine] = useState(null);
   const [dataFlowNodeId, setDataFlowNodeId] = useState(null); // node being inspected in DataFlow tab
-  const [showAiHud, setShowAiHud] = useState(false);
+
 
   const [simulatedEdges, setSimulatedEdges] = useState({});
   const [inactiveNodes, setInactiveNodes] = useState([]);
@@ -333,6 +181,11 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [rightPanelWidth, setRightPanelWidth] = useState(450);
   const [topHeightPercent, setTopHeightPercent] = useState(55);
+
+  const [discoveredSinks, setDiscoveredSinks] = useState([]);
+  const [isSinksModalOpen, setIsSinksModalOpen] = useState(false);
+  const [showSinksToast, setShowSinksToast] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   const isResizingSidebar = useRef(false);
   const isResizingRight = useRef(false);
@@ -409,7 +262,10 @@ function App() {
   }, [resizeVertical, stopResizeVertical]);
 
   const handleScanComplete = (data, dir) => {
-    setGlobalData(data);
+    // Strip any persisted aiExplanation from previous sessions (B-08)
+    const cleanNodes = data.nodes.map(n => ({ ...n, data: undefined, aiExplanation: undefined }));
+    const cleanData = { ...data, nodes: cleanNodes };
+    setGlobalData(cleanData);
     setDirectory(dir);
     setHasScanned(true);
     const allFiles = new Set(data.nodes.filter(n => n.type === 'file').map(n => n.id));
@@ -417,7 +273,13 @@ function App() {
     setFocusedNodeId(null);
     setExpandedNodes(new Set());
     clearSimulation();
-    setActiveTab('connections'); // Show connections tree immediately after scan
+    const sinks = data.discovered_sinks || [];
+    setDiscoveredSinks(sinks);
+    if (sinks.length > 0) {
+      setShowSinksToast(true);
+      setTimeout(() => setShowSinksToast(false), 8000);
+    }
+    setActiveTab('connections');
   };
 
   const handleScan = async (dirPath) => {
@@ -426,6 +288,14 @@ function App() {
     setScanError('');
     setScanResult(null);
     setDirectory(dirPath.trim());
+    
+    // Aggressive state cleanup
+    setFocusedNodeId(null);
+    setHighlightedNodeId(null);
+    setExpandedNodes(new Set());
+    setCollapsedFiles(new Set());
+    setVulnAlert(null);
+    
     try {
       const res = await fetch('http://127.0.0.1:8000/api/scan', {
         method: 'POST',
@@ -458,9 +328,7 @@ function App() {
     setSandboxData(null);
     setSimulatedDataFlow(null);
     setUseGlobalFlow(false);
-    setCurrentStepIndex(-1);
     setHighlightLine(null);
-    setVulnAlert(null);
     setHighlightedNodeId(null);
     try {
       const res = await fetch('http://127.0.0.1:8000/api/simulate/taint', {
@@ -481,7 +349,6 @@ function App() {
             ? '🛡️ El payload fue neutralizado por sanitización en todas las rutas al Sink.' 
             : '🚨 ¡Vulnerabilidad Confirmada! El payload alcanzó un Sink sin ser filtrado.'
         });
-        setLayoutMode('attack_path');
         setActiveTab('dataflow');
       } else if (data.status === 'no_path') {
         setVulnAlert({ message: 'ℹ️ El vector seleccionado no llama a ninguna función (Sin rutas).', type: 'warn' });
@@ -489,7 +356,7 @@ function App() {
         setVulnAlert({ message: `⚠️ Error del backend: ${JSON.stringify(data)}`, type: 'warn' });
       }
     } catch (e) {
-      setVulnAlert({ type: 'warning', message: 'Error de red en la simulación: ' + e.message });
+      setVulnAlert({ type: 'warn', message: 'Error de red en la simulación: ' + e.message });
     }
   };
 
@@ -524,6 +391,58 @@ function App() {
     }
   };
 
+  const handleRunDast = async (nodeId, targetParam, payload) => {
+    setDebuggerFuzzResults(null);
+    setDebuggerDastResult(null);
+    setDebuggerTargetParam(targetParam);
+    setIsDebuggerLoading(true);
+    setActiveTab('debugger');
+    
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/simulate/dast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node_id: nodeId, directory, target_param: targetParam, payload }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setDebuggerDastResult(data.dynamic_execution);
+      } else {
+        setVulnAlert({ type: 'danger', message: `Error en DAST: ${data.error}` });
+      }
+    } catch (err) {
+      setVulnAlert({ type: 'danger', message: `Error de red en DAST: ${err.message}` });
+    } finally {
+      setIsDebuggerLoading(false);
+    }
+  };
+
+  const handleRunFuzzer = async (nodeId, targetParam) => {
+    setDebuggerDastResult(null);
+    setDebuggerFuzzResults(null);
+    setDebuggerTargetParam(targetParam);
+    setIsDebuggerLoading(true);
+    setActiveTab('debugger');
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/simulate/fuzzing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node_id: nodeId, directory, target_param: targetParam }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setDebuggerFuzzResults(data.results);
+      } else {
+        setVulnAlert({ type: 'danger', message: `Error en Fuzzer: ${data.error}` });
+      }
+    } catch (err) {
+      setVulnAlert({ type: 'danger', message: `Error de red en Fuzzer: ${err.message}` });
+    } finally {
+      setIsDebuggerLoading(false);
+    }
+  };
+
   const handleSandboxTest = (nodeId) => {
     setSandboxNodeId(nodeId);
   };
@@ -549,20 +468,25 @@ function App() {
   };
 
   const handleAiExplain = async (nodeId) => {
-    setShowAiHud(true);
-    setIsAiLoading(true);
-    setAiExplanation('Analizando con IA...');
+    setGlobalData(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, aiExplanation: 'Analizando con IA...' } } : n)
+    }));
     try {
       const res = await fetch('http://127.0.0.1:8000/api/ai/explain', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ node_id: nodeId }),
       });
       const data = await res.json();
-      setAiExplanation(data.explanation || 'Sin análisis disponible.');
+      setGlobalData(prev => ({
+        ...prev,
+        nodes: prev.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, aiExplanation: data.explanation || 'Sin análisis disponible.' } } : n)
+      }));
     } catch (err) {
-      setAiExplanation(`Error: ${err.message}`);
-    } finally {
-      setIsAiLoading(false);
+      setGlobalData(prev => ({
+        ...prev,
+        nodes: prev.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, aiExplanation: `Error: ${err.message}` } } : n)
+      }));
     }
   };
 
@@ -625,10 +549,32 @@ function App() {
     } catch (e) { console.error('Hot-Reload error:', e); }
   };
 
+  // Compute focused graph
+  const filteredNodes = useMemo(() => {
+    if (!focusMode) return globalData.nodes;
+    
+    const sourceIds = globalData.discovered_sources?.map(s => s.node_id) || [];
+    const sinkIds = discoveredSinks.map(s => s.node_id) || [];
+    const criticalNodeIds = new Set([...sourceIds, ...sinkIds]);
+    
+    return globalData.nodes.filter(n => {
+      if (n.type === 'file') {
+        return globalData.nodes.some(child => child.parent === n.id && criticalNodeIds.has(child.id));
+      }
+      return criticalNodeIds.has(n.id);
+    });
+  }, [globalData.nodes, globalData.discovered_sources, discoveredSinks, focusMode]);
+
+  const filteredEdges = useMemo(() => {
+    if (!focusMode) return globalData.edges;
+    const validIds = new Set(filteredNodes.map(n => n.id));
+    return globalData.edges.filter(e => validIds.has(e.source) && validIds.has(e.target));
+  }, [globalData.edges, filteredNodes, focusMode]);
+
   const { visibleNodes, visibleEdges } = useGraphDerivation(
-    globalData.nodes, globalData.edges, focusedNodeId, expandedNodes,
+    filteredNodes, filteredEdges, focusedNodeId, expandedNodes,
     collapsedFiles, simulatedEdges, inactiveNodes, tracePath, currentStepIndex,
-    selectedFilepath, layoutMode
+    selectedFilepath
   );
 
   const hasSimulation = tracePath.length > 0;
@@ -649,11 +595,11 @@ function App() {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {hasScanned && (
             <button 
-              onClick={() => setShowAiHud(!showAiHud)} 
+              onClick={() => setFocusMode(!focusMode)} 
               style={{ 
-                background: showAiHud ? 'rgba(99, 102, 241, 0.2)' : '#374151', 
-                color: showAiHud ? '#818cf8' : '#f9fafb', 
-                border: `1px solid ${showAiHud ? '#6366f1' : '#4b5563'}`, 
+                background: focusMode ? 'rgba(245, 158, 11, 0.2)' : '#374151', 
+                color: focusMode ? '#fbbf24' : '#f9fafb', 
+                border: `1px solid ${focusMode ? '#f59e0b' : '#4b5563'}`, 
                 padding: '6px 14px', 
                 borderRadius: '6px', 
                 cursor: 'pointer', 
@@ -665,25 +611,10 @@ function App() {
                 transition: 'all 0.15s'
               }}
             >
-              🪄 Asistente IA
+              {focusMode ? '👀 Modo Foco: Activo' : '👁️ Modo Foco: Inactivo'}
             </button>
           )}
-          {hasScanned && (
-            <select
-              value={layoutMode}
-              onChange={(e) => setLayoutMode(e.target.value)}
-              style={{
-                background: '#1f2937', color: '#f3f4f6', border: '1px solid #4b5563',
-                padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', outline: 'none'
-              }}
-            >
-              <option value="hierarchical">🌳 Vista Jerárquica</option>
-              <option value="force">🌌 Red Orgánica</option>
-              <option value="radial">🎯 Vista Radial</option>
-              <option value="sequence">⏱️ Diagrama de Secuencia</option>
-              {hasSimulation && <option value="attack_path">☠️ Cadena de Explotación</option>}
-            </select>
-          )}
+
           {hasSimulation && (
             <button onClick={clearSimulation} style={{ background: '#374151', color: '#f9fafb', border: '1px solid #4b5563', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
               ✕ Limpiar Simulación
@@ -721,6 +652,8 @@ function App() {
                 setFocusedNodeId={(id) => { setFocusedNodeId(id); if (id) setExpandedNodes(p => new Set(p).add(id)); }}
                 onSimulate={handleSimulate}
                 sandboxData={sandboxData}
+                discoveredSinks={discoveredSinks}
+                onOpenSinks={() => setIsSinksModalOpen(true)}
               />
             </div>
 
@@ -797,6 +730,8 @@ function App() {
                 setFocusedNodeId={(id) => { setFocusedNodeId(id); if (id) setExpandedNodes(p => new Set(p).add(id)); }}
                 onSimulate={handleSimulate}
                 sandboxData={sandboxData}
+                discoveredSinks={discoveredSinks}
+                onOpenSinks={() => setIsSinksModalOpen(true)}
               />
             </div>
 
@@ -938,18 +873,11 @@ function App() {
                       </div>
                     )}
 
-                    {layoutMode === 'sequence' ? (
-                      <SequenceDiagram 
-                        nodes={visibleNodes} 
-                        edges={visibleEdges} 
-                      />
-                    ) : (
                       <GraphCanvas
                         nodes={visibleNodes}
                         edges={visibleEdges}
-                        layoutMode={layoutMode}
                         highlightedNodeId={highlightedNodeId}
-                        simulatedDataFlow={globalData.dataflow}
+                        simulatedDataFlow={simulatedDataFlow}
                         onSandboxTest={handleSandboxTest}
                         onNodeSelect={(fp, nodeId) => { setSelectedFilepath(fp); setHighlightLine(null); setHighlightedNodeId(nodeId); }}
                         onPaneClick={() => setHighlightedNodeId(null)}
@@ -962,8 +890,9 @@ function App() {
                         collapsedFiles={collapsedFiles}
                         onAiExplain={handleAiExplain}
                         onDataFlowInspect={handleDataFlowInspect}
+                        discoveredSources={globalData.discovered_sources}
+                        discoveredSinks={discoveredSinks}
                       />
-                    )}
                     <GraphLegend />
 
                     {/* Time-Travel Bar */}
@@ -1073,6 +1002,7 @@ function App() {
                     {[
                       { id: 'dataflow',    label: '🔍 Flujo de Datos', color: '#60a5fa' },
                       { id: 'connections', label: '🔗 Conexiones',     color: '#a78bfa' },
+                      { id: 'debugger',    label: '🐛 Debugger',       color: '#f59e0b' },
                     ].map(tab => (
                       <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
                         padding: '10px 20px', background: activeTab === tab.id ? '#1a1d27' : 'transparent',
@@ -1128,6 +1058,33 @@ function App() {
                         onSelectFileAndLine={handleSelectFileAndLine}
                       />
                     )}
+                    {activeTab === 'debugger' && (
+                      <div style={{ padding: isDebuggerLoading ? '20px' : '0', height: '100%', overflow: 'hidden' }}>
+                        {isDebuggerLoading ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af' }}>
+                            <div style={{ width: '32px', height: '32px', border: '3px solid rgba(245, 158, 11, 0.2)', borderTop: '3px solid #f59e0b', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '12px' }} />
+                            Ejecutando Micro-Sandbox...
+                          </div>
+                        ) : (!debuggerDastResult && !debuggerFuzzResults) ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6b7280' }}>
+                            No hay resultados del debugger. Haz clic derecho en una función de Python y selecciona 🧪 Sandbox.
+                          </div>
+                        ) : (
+                          <DebuggerPanel
+                            sandboxResult={debuggerDastResult}
+                            fuzzResults={debuggerFuzzResults}
+                            targetParam={debuggerTargetParam}
+                            directory={directory}
+                            onFrameSelect={(frame) => {
+                               if (frame && frame.line) {
+                                  setHighlightLine(frame.line);
+                               }
+                            }}
+                            style={{ height: '100%', border: 'none', borderRadius: 0 }}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1136,110 +1093,55 @@ function App() {
         )}
       </div>
 
-      {/* Floating HUD AI Assistant Panel */}
-      {showAiHud && (
-        <Rnd
-          default={{
-            x: window.innerWidth - 460,
-            y: 80,
-            width: 420,
-            height: 520,
-          }}
-          minWidth={320}
-          minHeight={300}
-          bounds="window"
-          dragHandleClassName="hud-drag-handle"
-          style={{
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            background: 'rgba(15, 17, 26, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            borderRadius: '12px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)',
-            overflow: 'hidden'
-          }}
-        >
-          {/* HUD Header */}
-          <div 
-            className="hud-drag-handle" 
-            style={{
-              padding: '12px 16px',
-              background: 'rgba(99, 102, 241, 0.15)',
-              borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'move',
-              userSelect: 'none',
-              flexShrink: 0
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '16px' }}>🪄</span>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#818cf8', letterSpacing: '0.5px' }}>
-                Asistente de IA (CodeXHound)
-              </span>
-            </div>
-            <button 
-              onClick={() => setShowAiHud(false)} 
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                cursor: 'pointer',
-                fontSize: '16px',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '4px',
-                transition: 'background 0.2s, color 0.2s'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = '#ef4444'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* HUD Content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', color: '#cbd5e1' }}>
-            {isAiLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', color: '#9ca3af' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  border: '3px solid rgba(99, 102, 241, 0.1)',
-                  borderTop: '3px solid #6366f1',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                }} />
-                <span style={{ fontSize: '13px' }}>Analizando lógica con IA...</span>
-              </div>
-            ) : aiExplanation ? (
-              formatAiExplanation(aiExplanation, (line) => setHighlightLine(line))
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', gap: '8px', color: '#6b7280', padding: '0 20px' }}>
-                <div style={{ fontSize: '40px' }}>🤖</div>
-                <span style={{ fontSize: '13px' }}>
-                  Haz clic derecho en cualquier nodo de función y selecciona **"🪄 Explicar Lógica (IA)"** para recibir un reporte completo en tiempo real.
-                </span>
-              </div>
-            )}
-          </div>
-        </Rnd>
-      )}
-
       {sandboxNodeId && (
         <SandboxModal
           nodeId={sandboxNodeId}
           directory={directory}
           onClose={() => setSandboxNodeId(null)}
           onSimulate={handleSandboxSimulate}
+          onRunDast={handleRunDast}
+          onRunFuzzer={handleRunFuzzer}
         />
       )}
+
+
+
+      {/* Sinks Discovery Toast Notification (Auto-dismissible) */}
+      {showSinksToast && discoveredSinks.length > 0 && !isSinksModalOpen && (
+        <div 
+          className="fixed top-4 right-4 z-40 bg-orange-500/90 hover:bg-orange-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all animate-in fade-in slide-in-from-top-5 duration-500"
+          style={{ cursor: 'default' }}
+        >
+          <div className="bg-white/20 p-2 rounded-full cursor-pointer" onClick={() => { setShowSinksToast(false); setIsSinksModalOpen(true); }}>
+            <AlertTriangle size={20} className="animate-pulse" />
+          </div>
+          <div className="cursor-pointer" onClick={() => { setShowSinksToast(false); setIsSinksModalOpen(true); }}>
+            <p className="font-semibold text-sm">Sinks Peligrosos Detectados</p>
+            <p className="text-xs opacity-90">Se encontraron {discoveredSinks.length} posibles vulnerabilidades.</p>
+          </div>
+          <button 
+            onClick={() => setShowSinksToast(false)}
+            style={{ marginLeft: '10px', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
+            title="Descartar"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Sinks Modal */}
+      <SinksModal 
+        isOpen={isSinksModalOpen} 
+        onClose={() => setIsSinksModalOpen(false)} 
+        discoveredSinks={discoveredSinks}
+        onGoToSink={(nodeId, line) => {
+          const filepath = nodeId.split('::')[0];
+          setSelectedFilepath(filepath);
+          setHighlightLine(line);
+          setFocusedNodeId(nodeId);
+          setHighlightedNodeId(nodeId);
+        }}
+      />
     </div>
   );
 }

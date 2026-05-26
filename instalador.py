@@ -38,9 +38,8 @@ def check_pnpm():
     
     print_warning("pnpm NO está instalado globalmente en el sistema.")
     print("Para instalar pnpm de forma segura, puedes elegir una de las siguientes opciones:")
-    print("  1) Ejecutar: npm install -g pnpm (si tienes Node.js/npm instalado)")
-    print("  2) Windows (PowerShell): iwr https://get.pnpm.io/install.ps1 -useb | iex")
-    print("  3) Linux/macOS: curl -fsSL https://get.pnpm.io/install.sh | sh -")
+    print("  1) Windows (PowerShell): iwr https://get.pnpm.io/install.ps1 -useb | iex")
+    print("  2) Linux/macOS: curl -fsSL https://get.pnpm.io/install.sh | sh -")
     print("  Para más detalles visita: https://pnpm.io/installation\n")
     return False
 
@@ -207,9 +206,34 @@ def check_tkinter(is_windows):
             print("  $ sudo apt-get install python3-tk")
         print("  (Aún podrás usar la aplicación escribiendo las rutas a mano si no lo instalas ahora).\n")
 
+def verify_sinks_db():
+    """Verify that the sinks database file exists in the analyzer directory."""
+    print_header("Verificación de Base de Datos de Sinks")
+    sinks_path = os.path.join(os.getcwd(), "analyzer", "sinks.json")
+    sinks_db_path = os.path.join(os.getcwd(), "analyzer", "sinks_db.py")
+    
+    if os.path.exists(sinks_path):
+        import json
+        try:
+            with open(sinks_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            total = sum(len(v) if isinstance(v, list) else 0 for v in data.values())
+            print_success(f"Base de datos de sinks encontrada: {total} sinks cargados desde {len(data)} categorías.")
+        except Exception as e:
+            print_warning(f"Archivo sinks.json encontrado pero no se pudo parsear: {e}")
+    else:
+        print_warning("No se encontró 'analyzer/sinks.json'. El análisis de sinks puede estar limitado.")
+        print_info("Este archivo contiene la base de datos de funciones peligrosas para el detector de sinks.")
+    
+    if os.path.exists(sinks_db_path):
+        print_success("Módulo sinks_db.py detectado correctamente.")
+    else:
+        print_warning("No se encontró 'analyzer/sinks_db.py'.")
+
 def main():
     print_header("Instalador de CodeXHound")
     print_info("Este script preparará el entorno de backend (Python) y frontend (React) para CodeXHound.")
+    print_info("Nuevas características incluidas: Panel de Sinks con scroll, DebuggerPanel integrado y Base de Datos de Sinks.")
     
     # 1. Detect Operating System
     system = platform.system()
@@ -239,10 +263,13 @@ def main():
     # 4. Setup Python Virtual Environment
     setup_python_venv(is_windows)
     
-    # 5. Setup Frontend
+    # 5. Verify sinks database
+    verify_sinks_db()
+    
+    # 6. Setup Frontend
     setup_frontend()
     
-    # 5. Finished
+    # 7. Finished
     print_header("Instalación Completada")
     print_success("CodeXHound se ha configurado con éxito.")
     print("\nPara iniciar la aplicación:")
@@ -254,6 +281,14 @@ def main():
     print("\n2. Iniciar el Frontend (React):")
     print("   $ cd frontend")
     print("   $ pnpm run dev")
+    print("\nFuncionalidades disponibles:")
+    print("  - Grafo interactivo de archivos, funciones y dependencias")
+    print("  - Análisis de flujo de datos línea a línea")
+    print("  - Simulación de taint interprocedural")
+    print("  - Ejecución dinámica en sandbox con fuzzer")
+    print("  - Explicaciones con IA (Groq / Gemini / OpenAI)")
+    print("  - Panel de Sinks Peligrosos con scroll y explicación de riesgos vía IA")
+    print("  - DebuggerPanel con análisis de taint visual")
     print("\n¡Todo listo para escanear y simular taints con seguridad!")
     print("=" * 60 + "\n")
 

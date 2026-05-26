@@ -10,7 +10,9 @@ from analyzer.parser import parse_file
 from analyzer.hybrid_detector import get_strategy
 from analyzer.ai_agent import explain_code_logic
 from analyzer.taint_engine import simulate_taint_flow
-from analyzer.dataflow_analyzer import analyze_function_dataflow
+from analyzer.dataflow_analyzer import analyze_function_dataflow, compute_interprocedural_dataflow, _build_summary, _find_function_node, SOURCE_PATTERNS
+from analyzer.sandbox_runner import execute_with_dast, run_dast_micro_sandbox, run_fuzzer
+from analyzer.sinks_db import get_sinks
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -53,6 +55,26 @@ class SaveRequest(BaseModel):
     filepath: str
     content: str
 
+class FrameExplainRequest(BaseModel):
+    line: int
+    code: str
+    vars: dict
+    tainted_vars: list
+    event: str
+    payload: str
+    func_name: str
+    vuln_type: str = ""
+
+class FuzzerRequest(BaseModel):
+    node_id: str
+    directory: str
+    target_param: str
+
+class SinkExplainRequest(BaseModel):
+    code: str
+    sink_name: str
+    func_name: str
+
 def _validate_directory(req_directory: str) -> str:
     root_dir = os.path.abspath(req_directory)
     if not os.path.isdir(root_dir):
@@ -76,7 +98,7 @@ def _validate_directory(req_directory: str) -> str:
 def sandbox_endpoint(req: SandboxRequest):
     root_dir = _validate_directory(req.directory)
 
-    all_nodes, all_edges, function_registry, _ = _run_scan(root_dir)
+    all_nodes, all_edges, function_registry, _, _ = _run_scan(root_dir)
     res = analyze_function_dataflow(req.node_id, function_registry, req.target_param)
     if "error" in res:
         return res
@@ -110,15 +132,14 @@ def sandbox_endpoint(req: SandboxRequest):
     }
 
 @app.post("/api/simulate/dast")
-@app.post("/api/simulate/fuzzing")  # alias legacy: ya no lanza payloads de ataque
 def dast_micro_sandbox_endpoint(req: SandboxRequest):
     """
     Micro-sandbox ejecutable aislado: corre la función con el payload del usuario
-    y devuelve cómo muta el dato línea a línea (memory trace), sin tocar el código en disco.
+    y devuelve frames estructurados para el DebuggerPanel + mutation_timeline legacy.
     """
     root_dir = _validate_directory(req.directory)
 
-    all_nodes, all_edges, function_registry, _ = _run_scan(root_dir)
+    all_nodes, all_edges, function_registry, _, _ = _run_scan(root_dir)
     res = analyze_function_dataflow(req.node_id, function_registry, req.target_param)
     if "error" in res:
         return {"status": "error", "error": res["error"]}
@@ -150,8 +171,254 @@ def dast_micro_sandbox_endpoint(req: SandboxRequest):
         "start_line": res.get("start_line", 0),
         "end_line": res.get("end_line", 0),
         "dynamic_execution": dynamic,
+        "frames": dynamic.get("frames", []),
         "mutation_timeline": dynamic.get("mutation_timeline", []),
         "execution_summary": dynamic.get("execution_summary", {}),
+    }
+
+
+@app.post("/api/simulate/fuzzing")
+def fuzzer_endpoint(req: FuzzerRequest):
+    """
+    Fuzzer multi-payload: ejecuta 12 payloads de ataque sobre la función objetivo.
+    Cada resultado incluye frames estructurados para el DebuggerPanel.
+    """
+    root_dir = _validate_directory(req.directory)
+
+    all_nodes, all_edges, function_registry, _, _ = _run_scan(root_dir)
+    res = analyze_function_dataflow(req.node_id, function_registry, req.target_param)
+    if "error" in res:
+        return {"status": "error", "error": res["error"]}
+
+    if res.get("language") != "python":
+        return {
+            "status": "error",
+            "error": "El fuzzer dinámico solo está disponible para funciones Python.",
+        }
+
+    from analyzer.sandbox_runner import run_fuzzer
+
+    func_name = res.get("func_name", req.node_id.split("::")[-1] if "::" in req.node_id else req.node_id)
+    filepath = res.get("filepath")
+
+    if not filepath or not func_name or func_name == "[Ámbito Global]":
+        return {"status": "error", "error": "No se pudo determinar el archivo de la función objetivo."}
+
+    results = run_fuzzer(filepath, func_name, req.target_param)
+    return {
+        "status": "success",
+        "func_name": func_name,
+        "filepath": filepath,
+        "start_line": res.get("start_line", 0),
+        "end_line": res.get("end_line", 0),
+        "fuzzer_results": results,
+    }
+
+
+@app.post("/api/ai/explain_sink")
+def explain_sink_endpoint(req: SinkExplainRequest):
+    """
+    IA explica por qué una función específica (sink) es peligrosa en el contexto dado.
+    """
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not groq_key and not gemini_key and not openai_key:
+        return {
+            "explanation": "Error: No se encontró ninguna API key configurada (GROQ_API_KEY, GEMINI_API_KEY o OPENAI_API_KEY).",
+            "severity": "info",
+        }
+
+    prompt = f"""Eres un experto en ciberseguridad analizando código fuente. Responde en español de forma concisa.
+
+Estás analizando la función `{req.func_name}` que contiene el uso de la función peligrosa (sink): `{req.sink_name}`.
+
+Código de la función:
+```
+{req.code}
+```
+
+Responde con exactamente tres secciones cortas:
+1. **¿Por qué este sink es peligroso?**: Explica qué hace `{req.sink_name}` y por qué se considera un riesgo de seguridad.
+2. **Posible explotación**: Explica cómo un atacante podría abusar de esto si los inputs no están sanitizados.
+3. **Recomendación de seguridad**: Cómo mitigar el riesgo o qué función segura usar como alternativa.
+"""
+
+    # Intentar con Groq
+    if groq_key and groq_key.startswith("gsk_"):
+        try:
+            import httpx
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=groq_key, 
+                base_url="https://api.groq.com/openai/v1",
+                http_client=httpx.Client(timeout=10.0)
+            )
+            for model_name in ["llama-3.3-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"]:
+                try:
+                    resp = client.chat.completions.create(
+                        model=model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.1,
+                        max_tokens=500
+                    )
+                    text = resp.choices[0].message.content.strip()
+                    return {"explanation": text, "severity": "critical"}
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"Groq explain_sink error: {e}")
+
+    # Intentar con OpenAI
+    if openai_key and openai_key.startswith("sk-"):
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_key)
+            for model_name in ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]:
+                try:
+                    resp = client.chat.completions.create(
+                        model=model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.1,
+                        max_tokens=500
+                    )
+                    text = resp.choices[0].message.content.strip()
+                    return {"explanation": text, "severity": "critical"}
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"OpenAI explain_sink error: {e}")
+
+    # Fallback a Gemini
+    if gemini_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key)
+            for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    response = model.generate_content(prompt, generation_config={"temperature": 0.1})
+                    text = response.text.strip()
+                    return {"explanation": text, "severity": "critical"}
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"Gemini explain_sink error: {e}")
+
+    return {
+        "explanation": "No se pudo obtener explicación de la IA. Intenta de nuevo.",
+        "severity": "info",
+    }
+
+
+@app.post("/api/ai/explain_frame")
+def explain_frame_endpoint(req: FrameExplainRequest):
+    """
+    IA explica exactamente qué ocurre en un frame específico del debugger:
+    por qué esa línea es relevante, qué hace con el payload y cómo corregirlo.
+    """
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not groq_key and not gemini_key and not openai_key:
+        return {
+            "explanation": "Error: No se encontró ninguna API key configurada (GROQ_API_KEY, GEMINI_API_KEY o OPENAI_API_KEY).",
+            "severity": "info",
+            "fix_suggestion": None,
+        }
+
+    vars_str = "\n".join(f"  {k} = {v}" for k, v in (req.vars or {}).items())
+    tainted_str = ", ".join(req.tainted_vars) if req.tainted_vars else "ninguna"
+
+    prompt = f"""Eres un experto en ciberseguridad analizando la ejecución dinámica de código. Responde en español de forma concisa.
+
+Estás analizando el frame de ejecución en la línea {req.line} de la función `{req.func_name}`.
+
+Contexto del frame:
+- Línea {req.line}: `{req.code}`
+- Tipo de evento: {req.event}
+- Payload inyectado: `{req.payload}`
+- Variables contaminadas (tainted): {tainted_str}
+- Estado de variables en este punto:
+{vars_str}
+{f'- Tipo de vulnerabilidad detectada: {req.vuln_type}' if req.vuln_type else ''}
+
+Responde con exactamente tres secciones:
+1. **¿Qué pasa aquí?**: Explica qué hace esta línea específica y por qué es relevante para la vulnerabilidad (2-3 oraciones).
+2. **¿Por qué es peligroso?**: Explica el riesgo concreto que representa esta línea en el contexto del payload inyectado (1-2 oraciones).
+3. **¿Cómo corregirlo?**: Da una sugerencia de código corregido para esta línea específica (código real, no genérico).
+
+Sé específico al código mostrado, NO des respuestas genéricas."""
+
+    # Intentar con Groq primero (más rápido)
+    if groq_key and groq_key.startswith("gsk_"):
+        try:
+            import httpx
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=groq_key, 
+                base_url="https://api.groq.com/openai/v1",
+                http_client=httpx.Client(timeout=10.0)
+            )
+            for model_name in ["llama-3.3-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"]:
+                try:
+                    resp = client.chat.completions.create(
+                        model=model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.1,
+                        max_tokens=600,
+                    )
+                    text = resp.choices[0].message.content
+                    severity = "critical" if req.event in ("sink", "propagate") else "warning" if req.event == "mutate" else "info"
+                    return {"explanation": text, "severity": severity, "fix_suggestion": None}
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"Groq explain_frame error: {e}")
+
+    # Intentar con OpenAI
+    if openai_key and openai_key.startswith("sk-"):
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_key)
+            for model_name in ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"]:
+                try:
+                    resp = client.chat.completions.create(
+                        model=model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.1,
+                        max_tokens=600,
+                    )
+                    text = resp.choices[0].message.content
+                    severity = "critical" if req.event in ("sink", "propagate") else "warning" if req.event == "mutate" else "info"
+                    return {"explanation": text, "severity": severity, "fix_suggestion": None}
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"OpenAI explain_frame error: {e}")
+
+    # Fallback: Gemini
+    if gemini_key:
+        try:
+            from google import genai
+            client = genai.Client(api_key=gemini_key)
+            for model_name in ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"]:
+                try:
+                    response = client.models.generate_content(model=model_name, contents=prompt)
+                    text = response.text
+                    severity = "critical" if req.event in ("sink", "propagate") else "warning" if req.event == "mutate" else "info"
+                    return {"explanation": text, "severity": severity, "fix_suggestion": None}
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"Gemini explain_frame error: {e}")
+
+    return {
+        "explanation": "No se pudo obtener explicación de la IA. Intenta de nuevo.",
+        "severity": "info",
+        "fix_suggestion": None,
     }
 
 @app.post("/api/analyze/dataflow")
@@ -162,12 +429,16 @@ def dataflow_endpoint(req: DataFlowRequest):
     """
     root_dir = _validate_directory(req.directory)
 
-    all_nodes, all_edges, function_registry, discovered_sources = _run_scan(root_dir)
+    all_nodes, all_edges, function_registry, discovered_sources, discovered_sinks = _run_scan(root_dir)
     result = analyze_function_dataflow(req.node_id, function_registry)
     return result
 
-def _run_scan(root_dir: str):
-    """Shared scan logic: returns (all_nodes, all_edges)."""
+from functools import lru_cache
+import time
+
+@lru_cache(maxsize=10)
+def _run_scan_cached(root_dir: str, cache_buster: int):
+    """Shared scan logic: returns (all_nodes, all_edges, function_registry, discovered_sources, discovered_sinks)."""
     files_to_parse = scan_directory(root_dir)
     filename_map = build_filename_map(files_to_parse)
 
@@ -215,7 +486,6 @@ def _run_scan(root_dir: str):
 
     # Pass 3: Source Auto-Discovery
     import re
-    from analyzer.dataflow_analyzer import SOURCE_PATTERNS, _find_function_node
     
     discovered_sources = []
     for filepath, language, tree, source_code in parsed_files:
@@ -245,7 +515,47 @@ def _run_scan(root_dir: str):
         except Exception as e:
             logger.exception(f"Error during auto-discovery in {filepath}: {e}")
 
-    return all_nodes, all_edges, function_registry, discovered_sources
+    # Pass 4: Sink Auto-Discovery
+    discovered_sinks = []
+    sink_regexes = {}
+    for lang in ["python", "javascript", "php"]:
+        lang_sinks = get_sinks(lang)
+        escaped_sinks = [re.escape(s) for s in sorted(lang_sinks, key=len, reverse=True)]
+        if escaped_sinks:
+            sink_regexes[lang] = re.compile(r'\b(?:' + '|'.join(escaped_sinks) + r')\s*\(')
+        
+    for filepath, language, tree, source_code in parsed_files:
+        try:
+            regex = sink_regexes.get(language)
+            if not regex: continue
+            
+            file_funcs = [n for n in all_nodes if n["type"] == "function" and n["parent"] == filepath]
+            for func in file_funcs:
+                func_name = func["label"]
+                func_node = _find_function_node(tree.root_node, func_name, source_code)
+                if func_node:
+                    start_byte = func_node.start_byte
+                    end_byte = func_node.end_byte
+                    func_body = source_code[start_byte:end_byte].decode('utf-8', errors='ignore')
+                    
+                    found_sinks = list(set(regex.findall(func_body)))
+                    if found_sinks:
+                        discovered_sinks.append({
+                            "node_id": func["id"],
+                            "label": func_name,
+                            "filepath": filepath,
+                            "sinks": found_sinks,
+                            "code": func_body
+                        })
+        except Exception as e:
+            logger.exception(f"Error during sink auto-discovery in {filepath}: {e}")
+
+    return all_nodes, all_edges, function_registry, discovered_sources, discovered_sinks
+
+def _run_scan(root_dir: str):
+    # Cache buster de 60 segundos o hash rápido del dir para no cachear infinitamente
+    cache_buster = int(time.time() / 60)
+    return _run_scan_cached(root_dir, cache_buster)
 
 
 @app.post("/api/scan")
@@ -253,9 +563,9 @@ def scan(req: ScanRequest):
     root_dir = _validate_directory(req.directory)
 
     logger.info(f"Scanning directory: {root_dir}")
-    all_nodes, all_edges, _, discovered_sources = _run_scan(root_dir)
-    logger.info(f"Scan complete: {len(all_nodes)} nodes, {len(all_edges)} edges, {len(discovered_sources)} sources found.")
-    return {"nodes": all_nodes, "edges": all_edges, "discovered_sources": discovered_sources}
+    all_nodes, all_edges, _, discovered_sources, discovered_sinks = _run_scan(root_dir)
+    logger.info(f"Scan complete: {len(all_nodes)} nodes, {len(all_edges)} edges, {len(discovered_sources)} sources, {len(discovered_sinks)} sinks found.")
+    return {"nodes": all_nodes, "edges": all_edges, "discovered_sources": discovered_sources, "discovered_sinks": discovered_sinks}
 
 
 @app.post("/api/read_file")
@@ -320,7 +630,9 @@ def explain_endpoint(req: ExplainRequest):
         with open(filepath, "r", encoding="utf-8") as f:
             snippet = f.read()
 
-    explanation = explain_code_logic(snippet, "unknown")
+    ext = filepath.rsplit('.', 1)[-1].lower() if '.' in filepath else 'txt'
+    detected_language = {'py': 'python', 'php': 'php', 'js': 'javascript'}.get(ext, 'unknown')
+    explanation = explain_code_logic(snippet, detected_language)
     return {"explanation": explanation}
 
 
@@ -329,13 +641,12 @@ def explain_endpoint(req: ExplainRequest):
 def simulate_endpoint(req: SimulateRequest):
     root_dir = _validate_directory(req.directory)
 
-    all_nodes, all_edges, function_registry, _ = _run_scan(root_dir)
+    all_nodes, all_edges, function_registry, _, _ = _run_scan(root_dir)
     result = simulate_taint_flow(req.source_id, req.payload, all_nodes, all_edges, function_registry)
     
     if result.get("status") == "success" and result.get("paths"):
-        paths = result.get("paths", [])
-        from analyzer.dataflow_analyzer import compute_interprocedural_dataflow
-        inter_steps = compute_interprocedural_dataflow(paths, all_edges, function_registry, req.payload)
+        paths = result.get("paths")
+        inter_steps = compute_interprocedural_dataflow(paths, all_edges, function_registry, req.payload, None)
         result["interprocedural_dataflow"] = inter_steps
 
     return result
